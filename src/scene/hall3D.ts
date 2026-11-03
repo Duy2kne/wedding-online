@@ -114,6 +114,14 @@ export class WeddingHall3D {
   private youtubeIframe?: HTMLIFrameElement;
   private redrawers: Array<() => void> = [];
   private onYoutubeMessage?: (e: MessageEvent) => void;
+  private ytSend?: (func: string, args?: unknown[]) => void;
+  private ytReady = false;
+  private videoSoundWanted = false;
+  private lastSoundApply = 0;
+  /** Gọi khi trình duyệt không cho phát tiếng video (cần khách bấm nút) */
+  public onSoundBlocked?: () => void;
+  /** Gọi khi video lỗi (bị xoá / tắt nhúng) để chuyển sang nhạc nền dự phòng */
+  public onVideoError?: (code: number) => void;
 
   private hemiLight!: THREE.HemisphereLight;
   private ambientLight!: THREE.AmbientLight;
@@ -914,10 +922,22 @@ export class WeddingHall3D {
         iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
       } catch {}
     };
+    this.ytSend = send;
     this.onYoutubeMessage = (e: MessageEvent) => {
       if (e.source !== iframe.contentWindow || typeof e.data !== 'string') return;
       try {
         const msg = JSON.parse(e.data);
+        // Trình phát đã sẵn sàng -> áp trạng thái tiếng mong muốn (bật nhạc video)
+        if (!this.ytReady && (msg.event === 'onReady' || msg.event === 'infoDelivery' || msg.event === 'initialDelivery')) {
+          this.ytReady = true;
+          this.applyVideoSound();
+        }
+        if (msg.event === 'onError') this.onVideoError?.(Number(msg.info));
+        // Muốn có tiếng mà YouTube vẫn báo đang tắt tiếng -> trình duyệt chặn (thường là iPhone)
+        if (msg.event === 'infoDelivery' && msg.info && typeof msg.info.muted === 'boolean') {
+          const blocked = this.videoSoundWanted && msg.info.muted;
+          if (blocked && Date.now() - this.lastSoundApply > 2500) this.onSoundBlocked?.();
+        }
         const ended =
           (msg.event === 'onStateChange' && msg.info === 0) ||
           (msg.event === 'infoDelivery' && msg.info && msg.info.playerState === 0);
@@ -945,6 +965,24 @@ export class WeddingHall3D {
 
   public getYoutubeIframe(): HTMLIFrameElement | undefined {
     return this.youtubeIframe;
+  }
+
+  /** Bật/tắt tiếng video: tiếng video chính là nhạc của cả sảnh */
+  public setVideoSound(on: boolean) {
+    this.videoSoundWanted = on;
+    this.applyVideoSound();
+  }
+
+  private applyVideoSound() {
+    if (!this.ytSend) return;
+    this.lastSoundApply = Date.now();
+    if (this.videoSoundWanted) {
+      this.ytSend('unMute');
+      this.ytSend('setVolume', [85]);
+      this.ytSend('playVideo');
+    } else {
+      this.ytSend('mute');
+    }
   }
 
   // ---------------- BÀN TIỆC ----------------
