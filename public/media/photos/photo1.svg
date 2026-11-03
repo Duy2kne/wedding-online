@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff0f5"/>
+      <stop offset="50%" stop-color="#ffe4e1"/>
+      <stop offset="100%" stop-color="#fed7d7"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#f687b3" stop-opacity="0.2"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg1)"/>
+  <circle cx="400" cy="240" r="160" fill="url(#glow)"/>
+  <!-- Couple Silhouette Stylized Art -->
+  <g transform="translate(400, 240)">
+    <!-- Groom -->
+    <path d="M -70 120 L -60 -20 Q -50 -60 -25 -65 Q 0 -60 5 -20 L 10 120 Z" fill="#2d3748" opacity="0.85"/>
+    <circle cx="-30" cy="-80" r="28" fill="#e2e8f0"/>
+    <path d="M -45 -95 Q -30 -115 -10 -95 Q -25 -105 -45 -95 Z" fill="#1a202c"/>
+    <!-- Bride -->
+    <path d="M -5 120 Q 30 70 25 -20 Q 40 -60 65 -60 Q 90 -60 95 -20 Q 90 70 135 120 Z" fill="#ffffff" opacity="0.95"/>
+    <path d="M -30 120 Q 60 130 160 120 Q 80 50 35 -10 Z" fill="#fff5f5" opacity="0.6"/>
+    <circle cx="65" cy="-75" r="26" fill="#fed7d7"/>
+    <path d="M 45 -95 Q 65 -120 85 -95 Q 65 -105 45 -95 Z" fill="#4a5568"/>
+    <!-- Bouquet -->
+    <circle cx="15" cy="15" r="18" fill="#f687b3"/>
+    <circle cx="28" cy="10" r="14" fill="#fc8181"/>
+    <circle cx="8" cy="24" r="14" fill="#faf089"/>
+    <!-- Heart above -->
+    <path d="M 15 -120 C 15 -135 -10 -135 -10 -115 C -10 -95 15 -80 15 -75 C 15 -80 40 -95 40 -115 C 40 -135 15 -135 15 -120 Z" fill="#e53e3e" opacity="0.9"/>
+  </g>
+  <rect x="40" y="40" width="720" height="520" fill="none" stroke="#d69e2e" stroke-width="6" rx="16" opacity="0.75"/>
+  <rect x="50" y="50" width="700" height="500" fill="none" stroke="#ecc94b" stroke-width="2" rx="12" opacity="0.5"/>
+  <text x="400" y="470" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="34" font-weight="bold" fill="#702459">Hoàng Duy ♥ Thiều Tâm</text>
+  <text x="400" y="510" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#97266d" letter-spacing="4">KHOẢNH KHẮC BÌNH YÊN · 29.11.2026</text>
+</svg>

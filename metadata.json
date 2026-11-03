@@ -1,0 +1,6 @@
+{
+  "name": "Tiệc Cưới Online 3D · Hoàng Duy ♥ Thiều Tâm",
+  "description": "Không gian tiệc cưới 3D trực tuyến nhiều người cùng lúc dành cho đám cưới Hoàng Duy & Thiều Tâm",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

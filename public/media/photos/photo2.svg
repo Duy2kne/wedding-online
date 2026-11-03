@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffaf0"/>
+      <stop offset="50%" stop-color="#feebc8"/>
+      <stop offset="100%" stop-color="#fbd38d"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg2)"/>
+  <circle cx="400" cy="220" r="140" fill="#fff" opacity="0.8"/>
+  <g transform="translate(400, 230)">
+    <!-- Couple Sunset Walk -->
+    <path d="M -50 90 L -45 -10 Q -40 -45 -20 -50 Q 0 -45 5 -10 L 10 90 Z" fill="#744210" opacity="0.9"/>
+    <circle cx="-20" cy="-65" r="22" fill="#feebc8"/>
+    <path d="M 0 90 Q 25 50 20 -10 Q 30 -45 50 -45 Q 70 -45 75 -10 Q 80 50 110 90 Z" fill="#dd6b20" opacity="0.9"/>
+    <circle cx="50" cy="-60" r="20" fill="#fed7d7"/>
+    <!-- Hands joined with heart -->
+    <circle cx="8" cy="20" r="10" fill="#f6ad55"/>
+    <path d="M 8 -90 C 8 -105 -12 -105 -12 -90 C -12 -75 8 -65 8 -60 C 8 -65 28 -75 28 -90 C 28 -105 8 -105 8 -90 Z" fill="#dd6b20"/>
+  </g>
+  <rect x="40" y="40" width="720" height="520" fill="none" stroke="#d69e2e" stroke-width="6" rx="16" opacity="0.75"/>
+  <text x="400" y="470" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="34" font-weight="bold" fill="#744210">Nắm Tay Nhau Dưới Hoàng Hôn</text>
+  <text x="400" y="510" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#975a16" letter-spacing="4">DUY &amp; TÂM · HÀNH TRÌNH HẠNH PHÚC</text>
+</svg>

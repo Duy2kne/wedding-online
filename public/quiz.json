@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "question": "Hoàng Duy và Thiều Tâm gặp nhau lần đầu tiên ở đâu?",
+    "options": ["Quán cà phê góc phố mùa thu", "Thư viện trường đại học", "Buổi họp lớp cấp 3", "Công viên hoàng hôn"],
+    "answer": 0
+  },
+  {
+    "id": 2,
+    "question": "Món ăn nào mà cô dâu Thiều Tâm thích nhất?",
+    "options": ["Bún bò Huế cay nồng", "Lẩu thái chua cay", "Sushi & Sashimi", "Bánh xèo giòn rụm"],
+    "answer": 1
+  },
+  {
+    "id": 3,
+    "question": "Chú rể Hoàng Duy thích hoạt động gì nhất vào cuối tuần?",
+    "options": ["Đọc sách và ngắm hoa", "Nấu ăn cùng Thiều Tâm", "Chơi cờ vua", "Đi phượt xe máy"],
+    "answer": 1
+  },
+  {
+    "id": 4,
+    "question": "Kỷ niệm đáng nhớ nhất trong chuyến du lịch đầu tiên của cả hai?",
+    "options": ["Ngắm hoàng hôn trên biển Phú Quốc", "Lạc đường ở Đà Lạt rồi ăn kem bơ", "Leo đỉnh Fansipan", "Chèo thuyền Tràng An"],
+    "answer": 1
+  },
+  {
+    "id": 5,
+    "question": "Ai là người ngỏ lời tỏ tình trước?",
+    "options": ["Hoàng Duy (với 99 đoá hồng)", "Thiều Tâm (rất cá tính)", "Cả hai cùng thổ lộ một lúc", "Bạn bè tác hợp đẩy thuyền"],
+    "answer": 0
+  },
+  {
+    "id": 6,
+    "question": "Bài hát kỷ niệm gắn liền với chuyện tình của Duy & Tâm là gì?",
+    "options": ["Ánh Nắng Của Anh", "Cưới Nhau Đi", "Một Nhà", "Hơn Cả Yêu"],
+    "answer": 3
+  },
+  {
+    "id": 7,
+    "question": "Thời gian Duy & Tâm đã hẹn hò trước khi quyết định về chung một nhà?",
+    "options": ["1 năm", "2 năm rưỡi", "4 năm yêu thương", "5 năm gắn bó"],
+    "answer": 2
+  },
+  {
+    "id": 8,
+    "question": "Màu sắc chủ đạo mà cả hai yêu thích cho tổ ấm tương lai?",
+    "options": ["Trắng kem & gỗ sồi ấm áp", "Xanh pastel tươi mát", "Hồng phấn lãng mạn", "Xám hiện đại"],
+    "answer": 0
+  },
+  {
+    "id": 9,
+    "question": "Chú cưng (thú cưng) mà Tâm và Duy dự định nuôi cùng nhau?",
+    "options": ["Chú cún Corgi chân ngắn", "Bé mèo Golden lông xù", "Bé thỏ trắng", "Một cặp cá bảy màu"],
+    "answer": 1
+  },
+  {
+    "id": 10,
+    "question": "Điều ước lớn nhất của Duy & Tâm trong ngày trọng đại hôm nay?",
+    "options": ["Được nhận thật nhiều quà to", "Tất cả người thân, bạn bè luôn bình an và hạnh phúc", "Đi du lịch vòng quanh thế giới", "Trúng số độc đắc"],
+    "answer": 1
+  }
+]

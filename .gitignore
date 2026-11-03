@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production build outputs
+dist/
+dist-ssr/
+server.js
+server.js.map
+*.local
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Runtime logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database & persistence files (keep directory structure)
+data/*.json
+!data/.gitkeep
+!public/media/photos/.gitkeep
+!public/media/video/.gitkeep
+!public/music/.gitkeep
+!public/sfx/.gitkeep
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db

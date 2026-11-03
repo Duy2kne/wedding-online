@@ -1,0 +1,455 @@
+# PROMPT: Web "Tiệc Cưới Online" 3D nhiều người · Hoàng Duy ♥ Thiều Tâm
+
+> **Cách dùng:** Không dán cả file một lần. Gửi cho AI **lần lượt từng PHẦN** ở cuối file (Phần 1 → 7). Mỗi phần xong, mở Preview kiểm tra chạy được rồi mới gửi phần tiếp theo.
+> Nếu chọn được model, hãy dùng bản **Pro** (đồ hoạ 3D cần model mạnh).
+> Nhớ đính kèm vài ảnh cưới và ảnh tham khảo phong cách (nếu có).
+
+---
+
+## 0. BỐI CẢNH CHUNG (dán kèm phần này ở đầu MỌI lần gửi)
+
+Bạn là lập trình viên full-stack giàu kinh nghiệm về **Three.js, React, Socket.IO**. Hãy xây dựng **hoàn chỉnh, chạy được ngay** một website **tiệc cưới online 3D nhiều người cùng lúc** cho cặp đôi **Hoàng Duy (chú rể)** và **Thiều Tâm (cô dâu)**, ngày cưới **29/11/2026**.
+
+- Khách mời vào web, **tự đặt tên**, **chọn nhân vật nam hoặc nữ**, **chọn trang phục**, rồi **đi lại tự do** trong không gian tiệc cưới 3D. Mọi người nhìn thấy nhau theo thời gian thực.
+- Khách có thể: **ngồi vào bàn tiệc**, **nâng ly rượu mừng**, **gửi lời chúc** cho cô dâu chú rể, **xem video cưới** trên màn hình lớn, **ngắm ảnh cưới** treo quanh sảnh, **chơi mini game** để nhận **điểm Hỷ** (💗), rồi dùng điểm **mua hoa tặng cô dâu chú rể** và **mua trang phục đẹp**.
+- Có **nhạc cưới** do chủ tiệc cung cấp.
+- Toàn bộ giao diện bằng **tiếng Việt**, phong cách **ấm áp, lãng mạn, sang trọng**: tông trắng kem, hồng phấn, vàng champagne, hoa tươi, đèn dây lấp lánh.
+- Web sẽ được **push lên GitHub** và **deploy lên server thật** (Render hoặc VPS), nên code phải sẵn sàng production.
+- Nhân vật dạng **chibi 3D low-poly dễ thương**, tự thiết kế phong cách riêng, không sao chép game hay thương hiệu có sẵn.
+
+### Công nghệ bắt buộc
+
+| Phần | Công nghệ |
+|---|---|
+| Server | Node.js 20+, Express, Socket.IO 4, TypeScript (`server.ts`) |
+| Client | React 19 + Vite + TypeScript + Tailwind CSS 4 |
+| 3D | Three.js (cài qua npm, không dùng CDN) |
+| Build server | **esbuild `"^0.27.0"`** (trong `devDependencies`) đóng gói `server.ts` → `server.js` |
+| Âm thanh | Web Audio API + thẻ `<audio>` cho file nhạc |
+| Icon | `lucide-react` |
+| CI/CD | GitHub Actions |
+
+**Bắt buộc có `package-lock.json` và commit lên GitHub.** Mọi nơi cài đặt (GitHub Actions, Render, Docker) đều dùng `npm ci`. Sau khi thêm hay bớt thư viện phải chạy `npm install` để lock file khớp với `package.json`. Nếu không, `npm ci` trên Render sẽ báo lỗi *"package.json and package-lock.json are not in sync"*.
+
+`package.json` tối thiểu:
+
+```json
+{
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && node build.mjs",
+    "start": "node server.js",
+    "check": "tsc --noEmit && node build.mjs --check"
+  },
+  "devDependencies": { "esbuild": "^0.27.0" }
+}
+```
+
+### Nội dung do chủ tiệc cung cấp (KHÔNG viết cứng trong code)
+
+Tất cả thông tin và file của cặp đôi đặt trong **một file cấu hình** cùng các thư mục cố định. Chủ tiệc chỉ cần thay file là xong, không phải sửa code:
+
+```
+public/
+├─ wedding.config.json   # tên cô dâu chú rể, ngày cưới, địa điểm, lời chào, link video ngoài (nếu có)
+├─ media/
+│  ├─ video/             # (tuỳ chọn) video .mp4 nhỏ để chạy thử không có mạng. Video chính phát từ YouTube (mục 5)
+│  ├─ photos/            # ảnh cưới .jpg/.png/.webp: treo quanh sảnh + dùng cho trò chơi
+│  └─ cover.jpg          # ảnh bìa màn hình chờ
+├─ music/                # nhạc cưới .mp3 (phát theo playlist)
+└─ sfx/                  # (tuỳ chọn) âm thanh: cheers.mp3 (cụng ly), applause.mp3, pop.mp3
+```
+
+`wedding.config.json` mẫu (AI tạo sẵn file này với giá trị mẫu):
+
+```json
+{
+  "groom": "Hoàng Duy",
+  "bride": "Thiều Tâm",
+  "date": "2026-11-29",
+  "time": "00:00",
+  "venue": "Online · Sảnh Diamond & Sảnh Sophia",
+  "halls": [
+    { "id": "diamond", "name": "Sảnh Diamond", "theme": "diamond" },
+    { "id": "sophia", "name": "Sảnh Sophia", "theme": "sophia" }
+  ],
+  "welcome": "Cảm ơn bạn đã đến chung vui cùng Duy & Tâm 💕",
+  "video": {
+    "mode": "youtube",
+    "youtubeId": "uIlNkfn6NcA",
+    "youtubeUrl": "https://youtu.be/uIlNkfn6NcA"
+  },
+  "hashtag": "#DuyTamWedding"
+}
+```
+
+- Server có các API trả danh sách file trong thư mục: `GET /api/media/photos`, `GET /api/media/videos`, `GET /api/music`. Trang web tự hiển thị tất cả file có trong đó.
+- Video cưới **phát từ YouTube** (Không công khai, đã cho phép nhúng): `https://youtu.be/uIlNkfn6NcA`. Chi tiết ở **mục 5**.
+- Khi chưa có ảnh, video hay nhạc, web vẫn chạy bình thường với ảnh mẫu, màn hình chờ và nhạc tổng hợp nhẹ nhàng.
+
+### Nguyên tắc kỹ thuật bắt buộc (rút kinh nghiệm từ dự án trước)
+
+1. **Server là nguồn sự thật:** điểm Hỷ, đồ đã mua, lời chúc, hoa tặng, kết quả trò chơi đều do server quyết định và kiểm tra. Client chỉ hiển thị và không bao giờ tự cộng điểm. Mỗi trình duyệt có một mã `uid` ngẫu nhiên lưu trong `localStorage`, server lưu điểm theo `uid` vào `data/wedding.json`, ghi định kỳ và khi tắt server (`SIGTERM`).
+2. **Đồ vật đồng bộ có 2 hàm riêng:**
+   - `addX(item)`: khi có 1 món mới (một bó hoa, một lời chúc), chỉ thêm vào và **không xoá món cũ**.
+   - `syncX(list)`: khi vào phòng hoặc khi server dọn đồ hết hạn thì mới đồng bộ toàn bộ danh sách.
+   - Nếu gộp chung một hàm thì món mới sẽ làm mất hết món cũ. Dự án trước đã bị lỗi này.
+3. **Mọi đồ vật tạo ra đều có thời hạn và giới hạn số lượng.** Ví dụ hoa trên sân khấu tối đa 60 bó, mỗi bó tồn tại 30 phút. Đồ hết hạn phải được `dispose()` geometry và material để không rò bộ nhớ.
+4. **Hiệu năng là ưu tiên hàng đầu:**
+   - Mục tiêu 60 FPS trên laptop thường, ≥ 30 FPS trên điện thoại tầm trung, với 50 người cùng phòng.
+   - Dùng chung geometry và material qua cache cấp module. Không `new Material` cho từng món đồ.
+   - Đồ lặp lại nhiều lần (ghế, ly, nến, hoa, đèn dây, cánh hoa rơi) dùng `InstancedMesh`.
+   - Gộp khối tĩnh cùng material bằng `BufferGeometryUtils.mergeGeometries`. **Toàn cảnh tối đa khoảng 300 draw call.** Kiểm tra qua `renderer.info.render.calls` và hiện số này trong chế độ debug (`?debug=1`).
+   - Tối đa **4 PointLight**. Đèn trang trí còn lại dùng vật liệu tự phát sáng (`emissive`) hoặc sprite phát sáng.
+   - Chỉ vật lớn mới đổ bóng (`castShadow`). Shadow map cập nhật chậm hơn khung hình (`shadowMap.autoUpdate = false`, cập nhật mỗi 3 khung).
+   - `devicePixelRatio` tối đa 2 trên máy tính, 1.5 trên điện thoại. **Tự giảm chất lượng** (tắt bóng, giảm hạt) nếu FPS dưới 30 trong 3 giây.
+   - Người chơi ở xa trên 25m thì cập nhật hoạt ảnh thưa hơn và ẩn bảng tên.
+   - React: **không gọi `setState` mỗi khung hình**. Chỉ cập nhật state khi giá trị thực sự đổi. Dữ liệu cập nhật liên tục để trong `useRef`.
+5. **Hiển thị nội dung người dùng** (tên, lời chúc, chat) bằng `textContent` hoặc JSX text, **không dùng `innerHTML`**. Server lọc ký tự điều khiển, giới hạn độ dài và lọc từ ngữ thô tục tiếng Việt cơ bản.
+
+---
+
+## 1. MÀN HÌNH CHỜ & TẠO NHÂN VẬT
+
+- **Nền:** cảnh sảnh cưới 3D, camera bay vòng chậm. Phía trước là thẻ thiệp cưới kính mờ, ghi "**Hoàng Duy ♥ Thiều Tâm**", ngày giờ và lời chào (đọc từ `wedding.config.json`), kèm **đồng hồ đếm ngược** tới 18:00 ngày 29/11/2026, hoặc dòng "Tiệc đang diễn ra" nếu đã tới giờ. Vào tiệc rồi thì đếm ngược hiện ở **màn hình phụ bên trái sân khấu** và một dòng nhỏ trên HUD, **không chiếm màn hình video chính**.
+- **Tên khách:** bắt buộc, 1–20 ký tự. Ô tuỳ chọn ghi "Bạn là khách của: Nhà trai / Nhà gái / Bạn bè".
+- **Giới tính nhân vật:** Nam / Nữ, có **xem trước nhân vật 3D xoay** ngay trên thẻ.
+- **Trang phục miễn phí** (mỗi giới tính 3 bộ):
+  - Nam: vest đen, vest xanh navy, áo dài nam.
+  - Nữ: váy dạ hội hồng phấn, áo dài đỏ, đầm trắng kem.
+  - Trang phục cao cấp mua bằng điểm Hỷ hiện kèm 🔒 và giá.
+- **Màu tóc, kiểu tóc:** 3 kiểu tóc cho mỗi giới tính.
+- **Chọn sảnh tiệc:** luôn có sẵn **2 sảnh chính là Sảnh Diamond và Sảnh Sophia**, mỗi sảnh tối đa **50 người**.
+  - **Đông khách thì tự mở thêm sảnh:** khi các sảnh đang mở đều đầy, server tự mở sảnh mới, lần lượt **"Sảnh Diamond 2"**, **"Sảnh Sophia 2"**, "Sảnh Diamond 3"… Sảnh mới mang phong cách của sảnh gốc, tối đa `MAX_HALLS` sảnh (mặc định 6, tức 300 khách cùng lúc). Khách được đưa vào ngay, kèm thông báo nhẹ "Sảnh Diamond đã đủ khách, bạn được mời sang Sảnh Diamond 2 💕".
+  - Sảnh mở thêm vắng khách 5 phút thì tự đóng. 2 sảnh chính không bao giờ đóng.
+  - Mỗi sảnh là một thẻ có ảnh xem trước, tên sảnh, thanh "32/50 khách", và nhãn **"Đã đủ khách"** khi đầy. Số khách cập nhật trực tiếp.
+  - Nút **"Vào nhanh"** xếp khách vào sảnh đông nhất mà còn chỗ, để mọi người gặp nhau nhiều hơn.
+  - **Chỉ khi đã đủ `MAX_HALLS` sảnh và tất cả đều đầy** mới cho vào hàng chờ, có số thứ tự, có chỗ thì tự vào.
+  - Link mời `?hall=diamond` hoặc `?hall=sophia` vào thẳng sảnh đó; sảnh đầy thì chuyển sang sảnh cùng phong cách còn chỗ.
+- **Nút "💒 Vào dự tiệc":** lưu tên, giới tính, trang phục vào `localStorage` để lần sau tự điền.
+- Chỉ phát nhạc sau khi người dùng bấm nút (chính sách autoplay của trình duyệt).
+
+---
+
+## 2. KHÔNG GIAN TIỆC CƯỚI 3D
+
+Dựng bằng code Three.js (hình khối + texture vẽ bằng canvas), không cần file model ngoài.
+
+**Hai sảnh dùng chung bố cục bên dưới nhưng khác phong cách trang trí** (đổi màu, đèn, hoa theo `theme`, viết trong một file `src/scene/hallThemes.ts`):
+
+| Sảnh | Phong cách |
+|---|---|
+| **Sảnh Diamond** 💎 | Sang trọng hiện đại: tông trắng, bạc, xanh băng; đèn chùm pha lê lấp lánh; hoa hồng trắng và lan hồ điệp; sàn đá bóng phản chiếu |
+| **Sảnh Sophia** 🌸 | Lãng mạn cổ điển: tông hồng phấn, kem, vàng champagne; đèn dây và nến ấm; hoa hồng phấn, mẫu đơn; rèm voan bay nhẹ |
+
+Mỗi sảnh có ghế, hoa tặng, lời chúc trên bảng 3D, ly cụng và trò hứng hoa **riêng**. Video cưới, ảnh cưới, nhạc, **sổ lưu bút (danh sách đầy đủ) và bảng điểm cao thì dùng chung** cho mọi sảnh. Lời chúc mới thì hiện thông báo ở mọi sảnh. Sảnh mở thêm (Diamond 2, Sophia 2…) dùng phong cách của sảnh gốc.
+
+Bố cục từ ngoài vào trong:
+
+1. **Cổng hoa cưới:** vòm hoa hồng trắng và hồng phấn, rèm voan bay nhẹ, bảng chữ "**Duy ♥ Tâm**". Khách xuất hiện ngay trước cổng.
+2. **Lối đi thảm đỏ** từ cổng vào sân khấu, hai bên có trụ nến, chậu hoa, đèn dây lấp lánh và cánh hoa rơi nhẹ.
+3. **Bàn ký tên / bàn lễ tân:** sổ lưu bút. Đứng gần bấm **"Ký sổ"** để để lại lời chúc (xem mục 4). Bên cạnh có **thùng mừng cưới** trang trí.
+4. **Sảnh tiệc:** 6–8 **bàn tròn** phủ khăn trắng, mỗi bàn 8 ghế bọc nơ satin, giữa bàn có bình hoa và nến. Trên bàn có ly rượu vang và chai rượu. Dùng `InstancedMesh` cho ghế, ly, khăn ăn.
+5. **Sân khấu:** phông nền hoa lớn có chữ tên cô dâu chú rể và ngày cưới, **tháp bánh cưới nhiều tầng**, **tháp ly champagne**. Trên sân khấu có 2 nhân vật đại diện cô dâu và chú rể đứng chào (NPC, xem mục 3).
+   - **Bố trí 3 màn hình trên sân khấu:**
+     - **Giữa (lớn nhất):** màn hình LED chính, **luôn chiếu video cưới** (mục 5).
+     - **Bên trái (nhỏ hơn):** màn hình **đếm ngược** tới 18:00 ngày 29/11/2026, dạng "còn 05 ngày 12:34:56", kèm tên cô dâu chú rể và ngày cưới. Đến giờ cưới thì đổi sang "💍 Hôn lễ đang diễn ra", có pháo giấy rơi 10 giây, rồi hiện "Trăm năm hạnh phúc · Duy ♥ Tâm".
+     - **Bên phải (nhỏ hơn):** **bảng điểm cao TOP 10** (mục 6.1).
+   - Hai màn hình phụ vẽ bằng canvas texture, chỉ vẽ lại khi số liệu đổi (đếm ngược thì mỗi giây 1 lần), không vẽ lại mỗi khung hình.
+6. **Màn hình LED lớn** cạnh sân khấu chiếu **video cưới** (xem mục 5).
+7. **Tường ảnh cưới:** khung ảnh viền vàng treo quanh tường sảnh, mỗi khung một ảnh trong `public/media/photos/`. Bấm hoặc chạm vào ảnh để **xem phóng to** dạng slideshow, có vuốt qua lại.
+8. **Khu trò chơi:** góc riêng có 3–4 **bục trò chơi** phát sáng, mỗi bục một trò (xem mục 6). Đến gần thì hiện "Nhấn **E** để chơi".
+9. **Quầy đổi quà:** shop hoa và tủ quần áo, nơi dùng điểm Hỷ (xem mục 7).
+10. **Ngoại cảnh:** khu vườn bên ngoài sảnh với cỏ, cây, hồ nhỏ có thiên nga và xích đu hoa để chụp ảnh. Bầu trời chiều hoàng hôn, có nút chuyển **Ngày / Đêm**. Ban đêm đèn dây và nến sáng lung linh.
+11. **Va chạm:** bàn, ghế, tường, sân khấu, cột chặn đường đi. **Leo lên chỗ cao trên 30cm** (sân khấu) thì phải đi bậc thang; **bước xuống** thì chỗ nào cũng được, độ cao hạ mượt. Camera tự rút lại gần khi bị tường che.
+
+---
+
+## 3. NHÂN VẬT, DI CHUYỂN & HÀNH ĐỘNG
+
+**Nhân vật chibi nam / nữ:**
+- Đầu to tròn, mặt vẽ bằng texture canvas (mắt to long lanh, má hồng, miệng cười). Khi nâng ly hay hôn gió thì đổi sang mắt nhắm cười.
+- **Cánh tay liền một khối:** dùng `SkinnedMesh` với 2 xương vai và khuỷu, không ghép ống tay và quả cầu bàn tay rời nhau. Góc tay cho từng tư thế (cầm ly, vỗ tay, chắp tay…) **giải bằng động học ngược** để bàn tay tới đúng chỗ mà không xuyên vào người.
+- Nữ: váy dài xòe, hiện mũi giày khi bước. Nam: quần âu và giày tây.
+- **Trang phục, phụ kiện** là các lớp thay được: áo, váy, nơ, cài tóc, vương miện hoa, kính, ví cầm tay.
+- **Bảng tên** trên đầu. Người khác thấy màu viền theo nhóm khách (nhà trai, nhà gái, bạn bè).
+- **Bong bóng chat** hiện trên đầu 6 giây.
+
+**Điều khiển:**
+- Máy tính:
+  - `WASD` hoặc phím mũi tên để đi, `Shift` để chạy.
+  - Kéo chuột xoay camera, lăn chuột zoom.
+  - `Enter` mở chat, `E` tương tác với vật gần nhất (ghế, bục trò chơi, ảnh, quầy).
+- Điện thoại:
+  - Chạm nửa trái màn hình hiện joystick dưới ngón tay, vuốt nửa phải xoay camera, chụm 2 ngón để zoom.
+  - Chạm lên mặt đất thì tự đi tới điểm đó.
+  - Đa chạm theo `pointerId`; chặn kéo trang và double-tap zoom.
+- **Tự đi:** khi bấm hành động gắn với địa điểm, nhân vật tự đi tới, đi qua cửa hoặc bậc thang khi cần, gặp vật cản thì vòng qua, kẹt quá 1.5 giây thì dịch chuyển tới đích. Bấm phím di chuyển thì huỷ việc tự đi.
+
+**Thanh hành động** (cuộn ngang được trên điện thoại, có mũi tên ‹ ›, hiện đủ trên máy tính 1000px):
+
+| Hành động | Mô tả | Đồng bộ |
+|---|---|---|
+| 🪑 Ngồi vào bàn | Tự đi tới **ghế trống gần nhất**, ngồi xuống (ghế đó bị giữ chỗ). Đứng dậy khi di chuyển | Server giữ chỗ ghế |
+| 🥂 Nâng ly | Đang ngồi hay đứng đều được: nâng ly rượu, hô "Một hai ba, dô!" bằng bong bóng chat. **Người cùng bàn bấm trong vòng 5 giây thì cụng ly chung**, có hiệu ứng lấp lánh và tiếng "keng" | +1 điểm, cụng chung +3 |
+| 💌 Chúc mừng | Mở hộp nhập lời chúc (tối đa 200 ký tự), chọn biểu tượng 💐💍🎉. Lời chúc bay lên **bảng lời chúc** cạnh sân khấu và hiện thông báo cho cả phòng | +5 điểm, 1 lần mỗi 2 phút |
+| 👏 Vỗ tay | Vỗ tay có tiếng | — |
+| 💃 Khiêu vũ | Đứng trên sàn nhảy thì nhảy theo nhạc. Hai người đứng gần cùng bấm thì **nhảy đôi** cầm tay xoay | +1 mỗi 30 giây |
+| 😘 Hôn gió | Thả trái tim bay về phía sân khấu | — |
+| 📸 Chụp ảnh | Đứng cạnh xích đu hoa hoặc phông sân khấu, tạo dáng. Chụp màn hình góc đẹp và cho tải ảnh về máy | — |
+| 👋 Vẫy chào | Vẫy tay | — |
+
+**NPC cô dâu chú rể** trên sân khấu: đứng nắm tay, thỉnh thoảng vẫy chào và cúi chào. Khi có người tặng hoa thì quay về phía người đó cảm ơn.
+
+---
+
+## 4. LỜI CHÚC & SỔ LƯU BÚT
+
+- **Bảng lời chúc** 3D cạnh sân khấu hiện 6 lời chúc mới nhất, tự cuộn. Có nút "📜 Xem tất cả lời chúc" mở danh sách đầy đủ, lọc theo nhà trai, nhà gái, bạn bè.
+- Lời chúc **lưu vĩnh viễn** trên server (`data/wedding.json`). Chủ tiệc có thể tải về dạng file **.txt / .csv** từ trang quản trị (mục 9) để làm kỷ niệm.
+- Server lọc từ ngữ thô tục, giới hạn mỗi người 1 lời chúc mỗi 2 phút.
+
+---
+
+## 5. VIDEO CƯỚI TRÊN MÀN HÌNH LỚN (nguồn chính: YouTube Không công khai)
+
+Màn hình LED chính giữa sân khấu **luôn chiếu video cưới**. Đếm ngược và bảng điểm nằm ở 2 màn hình phụ hai bên (mục 2), không chiếm màn hình chính.
+
+**Video:** `https://youtu.be/uIlNkfn6NcA`, mã video `uIlNkfn6NcA` ("Wedding Save the Date Video"). Video đã cho phép nhúng, YouTube phục vụ video nên **đông bao nhiêu khách cũng không làm nặng server**. YouTube tự chọn chất lượng theo mạng của từng người.
+
+### 5.1. Đặt video YouTube lên màn hình 3D
+
+- **Không dùng được `VideoTexture`:** iframe YouTube không thể làm texture WebGL. Hãy dùng **`CSS3DRenderer`** (`three/examples/jsm/renderers/CSS3DRenderer.js`) đặt một `CSS3DObject` chứa iframe khớp đúng vị trí, kích thước, góc của màn hình LED.
+- **Kỹ thuật "đục lỗ"** để nhân vật, hoa, bàn đứng trước màn hình vẫn che được video:
+  1. Lớp CSS3D nằm **dưới** canvas WebGL (`z-index` thấp hơn).
+  2. Canvas WebGL tạo với `alpha: true`.
+  3. Tại vị trí màn hình đặt một mesh phẳng dùng `MeshBasicMaterial({ color: 0x000000, opacity: 0, transparent: true, blending: THREE.NoBlending })`. Mesh này xoá điểm ảnh của canvas ở đó, để lộ iframe phía sau.
+  4. Vật thể đứng trước màn hình vẽ đè bình thường.
+  5. Canvas phải luôn có nền phủ kín (bầu trời, tường sảnh) để không lộ trang phía sau ở chỗ khác.
+- **Lớp CSS3D nhận chuột:** đặt `pointer-events: none` cho lớp CSS3D để kéo xoay camera vẫn hoạt động. Muốn tương tác với video thì dùng các nút trên HUD (mục 5.3).
+- **Mỗi khách chỉ 1 iframe.** CSS3DRenderer chỉ render đúng 1 object, rất nhẹ. Gọi `cssRenderer.render(scene3d, camera)` cùng vòng lặp với WebGL, dùng chung camera.
+- **Điện thoại yếu hoặc trình duyệt lỗi CSS3D:** tự chuyển sang **ảnh thumbnail** `https://i.ytimg.com/vi/uIlNkfn6NcA/maxresdefault.jpg` làm texture trên màn hình LED, kèm nút "▶ Xem video". Bấm thì mở video ở khung 2D (mục 5.3).
+
+### 5.2. Trình phát YouTube & đồng bộ cho cả sảnh
+
+- **Dùng YouTube IFrame Player API** (`https://www.youtube.com/iframe_api`), domain `www.youtube-nocookie.com`.
+  - Tham số: `autoplay=1, mute=1, controls=0, disablekb=1, modestbranding=1, rel=0, playsinline=1, iv_load_policy=3, fs=0, origin=<domain web>`.
+  - Lặp lại khi hết bằng sự kiện `onStateChange` (ENDED → `seekTo` về mốc đồng bộ), không dùng tham số `loop`.
+- **Đồng bộ mọi sảnh:** server giữ mốc "video bắt đầu lúc T" (theo giờ server). Client tính vị trí phát = ((giờ server − T) / 1000) % thời lượng. Thời lượng lấy bằng `getDuration()` sau `onReady`.
+  - Cứ 5 giây so `getCurrentTime()` với vị trí đúng. **Lệch trên 2.5 giây mới `seekTo`**, để không bị tua giật liên tục. YouTube chỉ cho đổi tốc độ phát theo mức cố định nên không chỉnh tốc độ.
+  - Lúc mới vào: `seekTo(vị trí đúng)` rồi `playVideo()`.
+  - Admin bấm "Phát lại từ đầu": server đặt T = bây giờ và phát `video:sync` cho mọi sảnh.
+- **Âm thanh:**
+  - Mặc định **tắt tiếng** (bắt buộc với autoplay, và để không đè nhạc cưới).
+  - Đứng gần màn hình (dưới 10m) thì hiện nút **"🔊 Nghe tiếng video"**: gọi `unMute()` + `setVolume(80)`, nhạc nền nhỏ dần về 15%. Đi xa hoặc bấm lại thì `mute()`, nhạc nền to lại.
+  - Trên iPhone, `unMute` chỉ hoạt động khi do người dùng bấm, nên gọi ngay trong sự kiện click.
+- **Tiết kiệm mạng:**
+  - Khách đi xa sân khấu (ra vườn, khu trò chơi) hơn 25m, hoặc chuyển sang tab khác (`visibilitychange`), thì `pauseVideo()`. Quay lại thì `seekTo` đúng mốc rồi `playVideo()`.
+  - Gợi ý chất lượng: điện thoại `setPlaybackQuality('medium')`, máy tính để YouTube tự chọn.
+- **Lỗi:**
+  - `onError` mã 101 hoặc 150 là chủ video tắt cho phép nhúng; mã 100 là video bị xoá hoặc riêng tư.
+  - Khi lỗi thì hiện thumbnail + dòng "Video sẽ sớm được chiếu 💕" trên màn hình LED, và báo lỗi rõ ràng trong trang `/admin`.
+  - **Không bao giờ để màn hình đen hay làm vỡ cả cảnh.**
+
+### 5.3. Nút xem video trên HUD
+
+- **"⛶ Xem video"** mở khung 2D lớn (modal) có trình phát YouTube đầy đủ nút điều khiển, đúng mốc đang chiếu. Đóng lại thì quay về màn hình 3D.
+- **Mở trên YouTube** (link `https://youtu.be/uIlNkfn6NcA`) cho ai muốn xem riêng.
+
+### 5.4. Cấu hình & bảo mật
+
+- `wedding.config.json` → `video.youtubeId` (đổi video chỉ cần sửa mã này rồi push). `video.mode`:
+  - `"youtube"` (mặc định);
+  - `"file"`: phát file `.mp4` nhỏ trong `public/media/video/` bằng `VideoTexture` khi chạy thử không có mạng;
+  - `"off"`: chỉ hiện ảnh bìa.
+- **Header CSP của `helmet`** phải cho phép YouTube, nếu không iframe sẽ trắng trơn:
+  - `frame-src https://www.youtube-nocookie.com https://www.youtube.com`
+  - `script-src https://www.youtube.com https://s.ytimg.com`
+  - `img-src https://i.ytimg.com`
+  - `connect-src` giữ `'self'` + `wss:`.
+- Server tự kiểm tra video lúc khởi động bằng oEmbed (`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=<ID>&format=json`):
+  - mã 200 là nhúng được;
+  - mã 401 là chủ video đã tắt cho phép nhúng;
+  - mã 404 là video riêng tư hoặc đã bị xoá.
+  - Kết quả hiện trong `/admin` và trả về ở `/health` dạng `video: "ok" | "embed_disabled" | "not_found"`.
+
+---
+
+## 6. TRÒ CHƠI NHẬN ĐIỂM HỶ 💗
+
+### 6.1. Bảng điểm cao (TOP điểm Hỷ)
+
+- **Màn hình 3D bên phải sân khấu** ở mọi sảnh hiện **TOP 10 điểm Hỷ toàn tiệc** (gộp mọi sảnh): hạng, huy chương 🥇🥈🥉 cho top 3, tên khách, nhóm khách (nhà trai, nhà gái, bạn bè), số điểm, và tên sảnh đang ở nếu đang online.
+- **Tự cập nhật:** server gom thay đổi và phát bảng mới tối đa 1 lần mỗi 3 giây. Ai vừa vượt hạng thì dòng đó sáng lên một chút.
+- **Ở góc HUD** có thẻ nhỏ "🏆 TOP 3" thu gọn được, kèm **hạng của chính mình** (ví dụ "Bạn đang hạng 14 · 85 💗").
+- **Nút 🏆** mở bảng đầy đủ với các tab:
+  - **Toàn tiệc**, **Sảnh này**, **Nhóm khách** (nhà trai / nhà gái / bạn bè);
+  - **Theo trò chơi:** ghép hình nhanh nhất, đố vui điểm cao nhất, hứng hoa nhiều nhất.
+- **Ai lên TOP 1:** thông báo toàn tiệc "👑 X vừa dẫn đầu bảng điểm Hỷ!", tối đa 1 lần mỗi 5 phút để không spam.
+- **Xếp hạng theo điểm tích luỹ** (không giảm khi tiêu điểm mua đồ), để mua hoa tặng không làm tụt hạng.
+- **Cuối tiệc:** trang `/admin` có nút **"Công bố khách chơi giỏi nhất"**. Màn hình chính chen 15 giây chúc mừng top 3, có pháo hoa, rồi quay lại video.
+
+### 6.2. Các trò chơi
+
+Mỗi trò mở bằng **cửa sổ 2D** (React) phủ lên cảnh 3D, có nút thoát. Server tạo đề và **kiểm tra kết quả**: client chỉ gửi đáp án hoặc lời giải, server chấm và cộng điểm. Giới hạn điểm tối đa mỗi trò mỗi ngày để chống cày, ví dụ 100 điểm mỗi trò mỗi ngày.
+
+1. **🧩 Ghép hình cô dâu chú rể** (bắt buộc)
+   - Chọn ngẫu nhiên một ảnh cưới, cắt thành lưới 3×3 (dễ), 4×4 (vừa) hoặc 5×5 (khó). Kéo thả, hoặc chạm 2 mảnh để đổi chỗ.
+   - Có đồng hồ bấm giờ và nút xem ảnh gốc.
+   - Server gửi thứ tự xáo trộn kèm mã ván. Client gửi lại thứ tự cuối và thời gian, server kiểm tra đúng mới cộng điểm.
+   - Điểm: dễ 10, vừa 20, khó 35, cộng thêm thưởng theo tốc độ.
+2. **🃏 Lật thẻ trí nhớ:** 12–16 thẻ úp là các cặp ảnh cưới. Lật 2 thẻ giống nhau thì giữ lại. Điểm theo số lượt và thời gian.
+3. **❓ Đố vui "Bạn hiểu Duy & Tâm bao nhiêu?"**
+   - 10 câu trắc nghiệm, câu hỏi để trong file `public/quiz.json` để chủ tiệc tự sửa. Ví dụ: "Duy & Tâm gặp nhau ở đâu?", "Món ăn Tâm thích nhất?".
+   - Mỗi câu 15 giây, đúng +5 điểm.
+   - Đáp án chỉ lưu ở server, không gửi xuống client.
+4. **💐 Hứng hoa cưới** (trò hành động, chơi chung cả phòng)
+   - Mỗi 10 phút, NPC cô dâu **tung bó hoa**, có đếm ngược thông báo cho cả phòng.
+   - Bó hoa bay theo quỹ đạo do server tính sẵn. Khách chạy vào vòng tròn rơi.
+   - Server chọn người gần điểm rơi nhất làm người hứng được, người đó +30 điểm, thông báo cả phòng "🎉 X đã hứng được hoa cưới!".
+5. **💘 Bắn tim** (tuỳ chọn): trái tim bay lên ở góc màn hình, chạm hoặc bấm vào để nổ trong 30 giây, tối đa 15 điểm mỗi lượt.
+
+Bảng xếp hạng: xem mục 6.1.
+
+---
+
+## 7. ĐIỂM HỶ: MUA HOA & TRANG PHỤC
+
+- **Hai con số:**
+  - **Điểm tích luỹ:** dùng để xếp hạng, không giảm.
+  - **Điểm khả dụng** = tích luỹ − đã tiêu, dùng để mua đồ.
+- **Shop hoa** (tặng cô dâu chú rể):
+  - Đoá hồng (10), bó cẩm tú cầu (30), lẵng hoa lớn (80), xe hoa mini (200).
+  - Mua xong, nhân vật tự đi lên sân khấu đặt hoa. Hoa **xuất hiện quanh sân khấu cho mọi người thấy**, kèm thẻ tên người tặng, tồn tại 30 phút, tối đa 60 bó, dùng chung geometry.
+  - Thông báo cả phòng "💐 X vừa tặng lẵng hoa cho Duy & Tâm". NPC quay ra cảm ơn.
+- **Tủ quần áo** (mua một lần, dùng mãi, mặc hoặc cởi được, người khác thấy ngay):
+  - Nam: vest trắng (100), vest nhung đỏ đô (150), áo dài gấm (150), nơ bướm vàng (40).
+  - Nữ: đầm công chúa (150), áo dài cưới đỏ thêu phượng (200), vương miện hoa (60), khăn voan (60).
+  - Chung: kính râm (30), vòng hào quang trái tim (300), hiệu ứng cánh hoa bay quanh người (250).
+- Giá và danh sách nằm trong **một file cấu hình** `src/shared/shop.ts`, dễ sửa.
+- **Danh hiệu theo điểm**, chỉ hiện trong bảng xếp hạng, **không hiện trên đầu nhân vật**: Khách mời → Bạn thân → Khách VIP → Người nhà.
+
+---
+
+## 8. ÂM NHẠC & ÂM THANH
+
+- **Playlist** từ `public/music/` (API `/api/music`). Có nút phát, dừng, bài tiếp, phát ngẫu nhiên, chỉnh âm lượng; tự chuyển bài khi hết; nhớ bài và âm lượng trong `localStorage`.
+- Không có file nhạc thì phát **nhạc tổng hợp** nhẹ nhàng (piano và dây kiểu lãng mạn) bằng Web Audio.
+- Tách riêng âm lượng nhạc và âm lượng hiệu ứng. Hiệu ứng có: tiếng cụng ly, vỗ tay, pháo giấy, tiếng "ting" khi được điểm. Nếu có file trong `public/sfx/` thì dùng file đó thay tiếng tổng hợp.
+- **Sàn nhảy:** đèn nhấp nháy theo nhịp nhạc (`AnalyserNode`).
+- **Lưu ý bản quyền** (ghi trong README): chỉ dùng nhạc có quyền sử dụng.
+
+---
+
+## 9. GIAO DIỆN (HUD), TRANG QUẢN TRỊ, NHIỀU NGƯỜI CHƠI
+
+**HUD:**
+- Góc trên trái: "Duy ♥ Tâm" + tên sảnh (💎 Diamond / 🌸 Sophia / Diamond 2…) + số khách "32/50". Bấm vào thì mở danh sách khách và danh sách sảnh, **chuyển sang sảnh khác** (nếu còn chỗ) mà không cần tải lại trang.
+- Dưới đó: dòng nhỏ đếm ngược "💍 còn 5 ngày 12:34:56" (đến giờ thì "Hôn lễ đang diễn ra") và thẻ "🏆 TOP 3 + hạng của bạn" thu gọn được (mục 6.1).
+- Góc trên phải: điểm Hỷ 💗 (bấm mở shop), 🏆 bảng xếp hạng, ✎ đổi tên và trang phục **không cần tải lại trang**, 🎵 nhạc, 🌙 ngày/đêm, ⛶ toàn màn hình. Trên điện thoại các nút thu nhỏ, không đè lên nhau.
+- Góc dưới trái: chat có câu nhanh: "Chúc mừng hạnh phúc! 💕", "Trăm năm hạnh phúc 💍", "Dô! 🥂", "Sớm có em bé nha 👶".
+- Giữa dưới: thanh hành động. Đứng gần vật tương tác thì hiện nhắc **"Nhấn E để …"**, trên điện thoại hiện nút chạm.
+- Thông báo (toast) ở giữa phía trên cho sự kiện lớn: tặng hoa, hứng hoa, cụng ly tập thể.
+
+**Trang quản trị `/admin`** (mật khẩu `ADMIN_PASSWORD`):
+- Xem và xoá lời chúc vi phạm, tải toàn bộ lời chúc (.csv).
+- Bấm "Tung hoa ngay", "Phát lại video từ đầu" (mọi sảnh), "Công bố khách chơi giỏi nhất".
+- Xem số khách mỗi sảnh, mở hoặc đóng sảnh phụ bằng tay.
+- Bật "Pháo hoa toàn sảnh" cho khoảnh khắc đặc biệt.
+- Xem số khách online.
+
+**Socket.IO** (server làm chủ, client nội suy mượt):
+- Sự kiện: `join`, `move` (tối đa khoảng 12 lần/giây, chỉ gửi khi thay đổi), `state` (phát mỗi 80ms, `volatile`), `action`, `chat`, `wish:add`, `flower:add`, `seat:take`, `seat:leave`, `game:start`, `game:submit`, `shop:buy`, `shop:equip`, `video:sync`, `bouquet:toss`, `profile:update`, `hall:switch`, `halls:list`, `leaderboard`.
+- Giới hạn tần suất: hành động 0.9 giây/lần, chat 0.7 giây/lần.
+- Tự kết nối lại khi rớt mạng.
+- **2 sảnh chính cố định** `diamond` và `sophia` (đọc từ `halls` trong `wedding.config.json`). Mỗi sảnh tối đa `MAX_PER_HALL` người (mặc định 50).
+  - **Đông thì tự mở sảnh phụ:** khi mọi sảnh đang mở đều đầy, mở sảnh mới xen kẽ phong cách: `diamond-2`, `sophia-2`, `diamond-3`… tối đa `MAX_HALLS` sảnh (mặc định 6). Sảnh phụ trống 5 phút thì đóng.
+  - Hàng chờ chỉ dùng khi đã đủ `MAX_HALLS` sảnh và tất cả đều đầy.
+  - Kiểm tra chỗ trống và nhận khách trong cùng một thao tác ở server, để 2 người vào cùng lúc không làm sảnh vượt 50.
+  - Cả 2 sảnh đầy thì đưa khách vào **hàng chờ**: server báo số thứ tự, có người rời thì tự đưa khách đầu hàng vào sảnh vừa trống.
+  - Khách rớt mạng được giữ chỗ 30 giây để kết nối lại không mất chỗ.
+- `GET /health` trả `{ ok, uptime, players, halls: { diamond: 50, sophia: 50, "diamond-2": 12 }, queue }`.
+
+---
+
+## 10. GITHUB & TRIỂN KHAI (BẮT BUỘC)
+
+- `.gitignore`: `node_modules/`, `dist/`, `server.js`, `.env`, `data/*.json`, `*.log`. **Commit `package-lock.json`.** Giữ `data/.gitkeep`, `public/music/.gitkeep`, `public/media/photos/.gitkeep`, `public/media/video/.gitkeep`.
+- **GitHub Pages không chạy được server Node.js.** Deploy lên **Render** (có gói miễn phí) hoặc VPS, việc deploy do GitHub Actions thực hiện.
+- `.github/workflows/ci.yml` (chạy mỗi lần push hoặc mở PR): `actions/setup-node@v4` (node 20, `cache: npm`) → `npm ci` → `npm run check` → `npm run build` → bật server chạy nền, gọi `curl --retry 10 --retry-connrefused http://localhost:3000/health`, rồi tắt.
+- `.github/workflows/deploy.yml` (chạy khi push lên `main` và chạy tay được): job build xong mới tới job deploy.
+  - Render: `curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"`, trong `render.yaml` đặt `autoDeploy: false`.
+  - VPS: `appleboy/ssh-action` rồi chạy `git pull && npm ci && npm run build && pm2 reload wedding`.
+  - Deploy xong thì kiểm tra `APP_URL/health`.
+- `render.yaml`: `buildCommand: npm ci && npm run build`, `startCommand: npm start`, `healthCheckPath: /health`.
+- `Dockerfile` multi-stage, chạy bằng user không phải root. Tắt server gọn gàng khi nhận `SIGTERM` (lưu dữ liệu trước).
+- **Biến môi trường** (`.env.example`):
+
+| Biến | Mặc định | Ghi chú |
+|---|---|---|
+| `PORT` | `3000` | |
+| `HOST` | `0.0.0.0` | |
+| `MAX_PER_HALL` | `50` | số khách tối đa mỗi sảnh |
+| `MAX_HALLS` | `6` | số sảnh tối đa (2 sảnh chính + 4 sảnh phụ tự mở khi đông → 300 khách) |
+| `ADMIN_PASSWORD` | *(tự đặt)* | mật khẩu `/admin` |
+| `CORS_ORIGIN` | `*` khi thử, tên miền thật khi deploy | |
+| `DATA_DIR` | `./data` | trỏ tới ổ đĩa bền vững nếu có |
+
+- **Lưu ý trong README:** Render gói miễn phí **xoá ổ đĩa mỗi lần deploy**, nên điểm, lời chúc và đồ đã mua sẽ mất. Muốn giữ lâu dài thì gắn **Persistent Disk** và đặt `DATA_DIR` trỏ vào đó, hoặc dùng database (Supabase hay MongoDB Atlas gói miễn phí). Nên tải lời chúc về trước mỗi lần deploy.
+- **Video lớn:** GitHub chặn file trên 100MB, giao diện web chỉ cho upload file dưới 25MB. Nén video bằng HandBrake (H.264, 720p), hoặc đặt video ở nơi khác rồi điền `videoUrl`.
+- **README tiếng Việt từng bước:** chạy local (`npm install`, `npm run dev`); thay ảnh, video, nhạc, câu đố, giá shop; push GitHub bằng `git` (từng lệnh); thêm GitHub Secrets; deploy Render; trỏ tên miền riêng.
+- **README có mục "Đổi video cưới":**
+  1. Upload video lên YouTube.
+  2. Chọn chế độ **"Không công khai"** và bật **"Cho phép nhúng"**.
+  3. Copy mã video (phần sau `youtu.be/` hoặc `v=`) vào `video.youtubeId`, rồi push.
+  - Kèm lưu ý: video YouTube Không công khai của chính mình thường không có quảng cáo nếu không bật kiếm tiền; nhạc có bản quyền trong video có thể bị YouTube tắt tiếng hoặc chặn nhúng.
+- **Trang `/admin`** hiện trạng thái video (nhúng được, bị tắt nhúng, hay không tìm thấy) và nút "Kiểm tra video" (gọi lại oEmbed), để biết trước khi tiệc bắt đầu.
+
+---
+
+## 11. TIÊU CHÍ NGHIỆM THU
+
+- [ ] Mở 3 tab: 3 nhân vật nam/nữ khác trang phục thấy nhau, di chuyển mượt, tên hiện trên đầu và **không có danh hiệu trên đầu**.
+- [ ] Đi bằng bàn phím và joystick; không xuyên tường, bàn, ghế; lên sân khấu bằng bậc, bước xuống ở đâu cũng được.
+- [ ] Ngồi đúng ghế trống; 2 người cùng bàn nâng ly trong 5 giây thì cụng ly chung và cộng điểm đúng.
+- [ ] Gửi 5 lời chúc từ 2 người: bảng lời chúc hiện đủ, người vào sau cũng thấy, tải được file .csv.
+- [ ] Video YouTube `uIlNkfn6NcA` phát trên màn hình LED chính, nhân vật đi ngang trước màn hình vẫn che được video. 2 tab xem cùng một đoạn (lệch dưới 3 giây). Nút "🔊 Nghe tiếng video" bật tiếng được, kể cả trên iPhone. Đi xa sân khấu hoặc đổi tab thì video tạm dừng, quay lại thì phát đúng mốc. Kéo chuột trên màn hình video vẫn xoay được camera. `/health` báo `video: "ok"`.
+- [ ] Màn hình phụ trái đếm ngược đúng tới 18:00 ngày 29/11/2026, đến giờ thì đổi sang "Hôn lễ đang diễn ra". Màn hình phụ phải hiện TOP 10 điểm Hỷ, cập nhật khi có người được điểm. HUD hiện TOP 3 và hạng của mình.
+- [ ] Ảnh trong `public/media/photos/` hiện trên tường và mở xem phóng to được.
+- [ ] Ghép hình 3×3 thành công thì được điểm; sửa thứ tự giả gửi lên server thì không được điểm.
+- [ ] Mua hoa: hoa hiện trên sân khấu cho mọi người, **mua 10 bó thì thấy đủ 10 bó**. Mua trang phục: người khác thấy ngay, tải lại trang vẫn còn.
+- [ ] Hứng hoa cưới: cả sảnh thấy hoa bay, đúng 1 người nhận điểm.
+- [ ] 2 sảnh Diamond và Sophia có phong cách khác nhau. Đặt tạm `MAX_PER_HALL=2`, `MAX_HALLS=3`, mở 7 tab: 4 tab đầu vào Diamond và Sophia, tab 5–6 được **tự mở "Sảnh Diamond 2"**, tab 7 vào hàng chờ và tự vào khi có tab thoát. Sảnh phụ trống 5 phút thì đóng. Chuyển sảnh trong HUD không cần tải lại trang.
+- [ ] Đổi tên và trang phục không cần tải lại trang.
+- [ ] 50 người, 60 bó hoa trong một sảnh: **dưới 300 draw call**, máy tính ≥ 50 FPS, điện thoại ≥ 30 FPS.
+- [ ] Nhạc từ `public/music` phát được và đổi bài được; chưa có file thì có nhạc tổng hợp.
+- [ ] `npm ci && npm run check && npm run build` chạy được; `ci.yml` chạy xanh; push `main` thì `deploy.yml` deploy và `/health` OK; không lỗi console.
+
+---
+
+# CÁC PHẦN GỬI LẦN LƯỢT CHO AI
+
+> Mỗi lần gửi: **dán mục 0 (Bối cảnh chung)** + **đúng một Phần bên dưới** + câu "Các mục chi tiết tham khảo ở trên". Mỗi Phần xong phải chạy được, `npm run check` không lỗi.
+
+**PHẦN 1. Khung dự án + server:**
+"Tạo khung dự án theo mục 0 và mục 10 (package.json, package-lock.json, build.mjs, server.ts, render.yaml, Dockerfile, .gitignore, .env.example, 2 workflow GitHub Actions, README). Server: 2 sảnh chính Diamond/Sophia (50 người/sảnh), tự mở sảnh phụ khi đông tới `MAX_HALLS`, hàng chờ khi đã tối đa, join, move, state, chat, uid, lưu `data/wedding.json`, API media/music/health, đọc `wedding.config.json`. Client: React + Three.js hiện một sàn trống và nhân vật hình khối đi lại bằng WASD được. Chưa cần đồ hoạ đẹp."
+
+**PHẦN 2. Không gian tiệc cưới:**
+"Làm mục 2: cổng hoa, thảm đỏ, bàn tròn và ghế (InstancedMesh), sân khấu, màn hình LED, tường ảnh, khu trò chơi, quầy shop, vườn, ngày/đêm, va chạm, bậc sân khấu. Tuân thủ các nguyên tắc hiệu năng ở mục 0: dưới 300 draw call, tối đa 4 PointLight. Bật `?debug=1` hiện số draw call và FPS."
+
+**PHẦN 3. Nhân vật & điều khiển:**
+"Làm mục 1 (màn hình chờ, chọn nam/nữ, trang phục, xem trước 3D) và mục 3 (nhân vật chibi tay liền khối SkinnedMesh, trang phục thay được, điều khiển máy tính và điện thoại, tự đi, thanh hành động, ngồi ghế, nâng ly, cụng ly chung, khiêu vũ, NPC cô dâu chú rể)."
+
+**PHẦN 4. Lời chúc, video, ảnh:**
+"Làm mục 4 (lời chúc, sổ lưu bút, xuất .csv), mục 5 (video YouTube `uIlNkfn6NcA` trên màn hình LED chính bằng CSS3DRenderer + kỹ thuật đục lỗ, đồng bộ mọi sảnh, nút nghe tiếng, CSP cho YouTube), 2 màn hình phụ đếm ngược và TOP 10 (mục 2, 6.1) và phần xem ảnh phóng to."
+
+**PHẦN 5. Trò chơi:**
+"Làm mục 6: ghép hình (bắt buộc), lật thẻ, đố vui, hứng hoa cưới, bắn tim. Server tạo đề và chấm điểm, giới hạn điểm mỗi ngày, có bảng xếp hạng."
+
+**PHẦN 6. Điểm Hỷ, shop, âm nhạc, HUD:**
+"Làm mục 7 (shop hoa, tủ quần áo, hoa hiện trên sân khấu dùng `addFlower` không xoá hoa cũ), mục 8 (âm nhạc), mục 9 (HUD, trang `/admin`, đổi tên và trang phục không cần tải lại trang)."
+
+**PHẦN 7. Hoàn thiện:**
+"Rà toàn bộ theo mục 11. Đo draw call và FPS khi có 50 người, 60 bó hoa và video đang phát, tối ưu nếu chưa đạt. Kiểm tra trên khung điện thoại 390px. Hoàn thiện README hướng dẫn thay ảnh, video, nhạc và deploy."

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <radialGradient id="covBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#fff5f5"/>
+      <stop offset="40%" stop-color="#fed7e2"/>
+      <stop offset="80%" stop-color="#fbb6ce"/>
+      <stop offset="100%" stop-color="#f687b3"/>
+    </radialGradient>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="url(#covBg)"/>
+  <circle cx="640" cy="340" r="280" fill="#ffffff" opacity="0.45" filter="url(#softGlow)"/>
+  <rect x="60" y="60" width="1160" height="600" fill="none" stroke="#d69e2e" stroke-width="4" rx="24" opacity="0.8"/>
+  <rect x="76" y="76" width="1128" height="568" fill="none" stroke="#ecc94b" stroke-width="2" rx="20" opacity="0.5"/>
+  <text x="640" y="240" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="28" fill="#97266d" letter-spacing="8">LỄ THÀNH HÔN</text>
+  <text x="640" y="340" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-size="64" font-weight="bold" fill="#702459">Hoàng Duy ♥ Thiều Tâm</text>
+  <text x="640" y="420" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="24" fill="#97266d" letter-spacing="5">CHỦ NHẬT · 29 THÁNG 11 NĂM 2026</text>
+  <text x="640" y="470" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#b83280">Sảnh Diamond &amp; Sảnh Sophia · Tiệc Cưới Trực Tuyến 3D</text>
+  <text x="640" y="540" text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#702459" font-style="italic">"Hai trái tim hòa chung một nhịp đập, trọn đời yêu thương"</text>
+</svg>

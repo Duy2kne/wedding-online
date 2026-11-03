@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 360" width="420" height="360">
+  <!-- Couple Together (Hoàng Duy ♥ Thiều Tâm) Face Cutout -->
+  <defs>
+    <radialGradient id="cSkin1" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#fff5eb"/>
+      <stop offset="85%" stop-color="#fed7aa"/>
+    </radialGradient>
+    <radialGradient id="cSkin2" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#fff5f5"/>
+      <stop offset="85%" stop-color="#fbcfe8"/>
+    </radialGradient>
+    <filter id="softGlowCouple" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#e11d48" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#softGlowCouple)">
+    <!-- Heart backdrop between them -->
+    <path d="M 210 130 C 210 100 170 100 170 125 C 170 150 210 175 210 180 C 210 175 250 150 250 125 C 250 100 210 100 210 130 Z" fill="#f43f5e" opacity="0.85"/>
+
+    <!-- Left: Groom Hoàng Duy -->
+    <g transform="translate(130, 160) scale(0.9)">
+      <ellipse cx="0" cy="0" rx="60" ry="70" fill="url(#cSkin1)"/>
+      <circle cx="-62" cy="0" r="12" fill="#fdba74"/>
+      <!-- Hair -->
+      <path d="M -60 -20 C -60 -80 -30 -110 5 -115 C 40 -118 70 -90 65 -20 C 55 -40 20 -60 -10 -55 Z" fill="#1c1917"/>
+      <!-- Eyes & Smile -->
+      <ellipse cx="-25" cy="-8" rx="7" ry="6" fill="#1c1917"/>
+      <circle cx="-23" cy="-10" r="2" fill="#ffffff"/>
+      <ellipse cx="25" cy="-8" rx="7" ry="6" fill="#1c1917"/>
+      <circle cx="27" cy="-10" r="2" fill="#ffffff"/>
+      <path d="M -15 28 Q 0 44 15 28" stroke="#b91c1c" stroke-width="3" stroke-linecap="round" fill="#ffffff"/>
+      <!-- Bow tie -->
+      <path d="M -18 85 L 0 95 L -18 105 Z" fill="#0f172a"/>
+      <path d="M 18 85 L 0 95 L 18 105 Z" fill="#0f172a"/>
+      <circle cx="0" cy="95" r="5" fill="#0f172a"/>
+    </g>
+
+    <!-- Right: Bride Thiều Tâm with Veil -->
+    <g transform="translate(280, 160) scale(0.9)">
+      <!-- Veil -->
+      <path d="M -40 -70 Q 0 -110 50 -70 Q 80 50 60 140 Q 0 160 -40 140 Z" fill="#ffffff" opacity="0.6"/>
+      <ellipse cx="0" cy="0" rx="56" ry="66" fill="url(#cSkin2)"/>
+      <circle cx="58" cy="0" r="10" fill="#fbcfe8"/>
+      <!-- Hair & Tiara -->
+      <path d="M -55 -20 C -60 -70 -25 -105 5 -105 C 40 -105 65 -70 60 -20 C 50 -45 25 -60 0 -60 C -25 -60 -45 -45 -55 -20 Z" fill="#171717"/>
+      <path d="M -25 -95 L -15 -110 L -5 -98 L 5 -115 L 15 -98 L 25 -110 L 35 -95 Z" fill="#fef08a"/>
+      <!-- Eyes with lashes & Smile -->
+      <ellipse cx="-22" cy="-10" rx="7" ry="6" fill="#171717"/>
+      <circle cx="-20" cy="-12" r="2.5" fill="#ffffff"/>
+      <ellipse cx="22" cy="-10" rx="7" ry="6" fill="#171717"/>
+      <circle cx="24" cy="-12" r="2.5" fill="#ffffff"/>
+      <path d="M -15 22 Q 0 38 15 22" stroke="#e11d48" stroke-width="3" stroke-linecap="round" fill="#fda4af"/>
+      <ellipse cx="-35" cy="8" rx="10" ry="6" fill="#f43f5e" opacity="0.3"/>
+      <ellipse cx="35" cy="8" rx="10" ry="6" fill="#f43f5e" opacity="0.3"/>
+    </g>
+  </g>
+
+  <!-- Tag Label -->
+  <rect x="110" y="322" width="200" height="28" rx="14" fill="#991b1b" opacity="0.95"/>
+  <text x="210" y="341" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="13" font-weight="bold" fill="#fef08a">Hoàng Duy ♥ Thiều Tâm</text>
+</svg>
