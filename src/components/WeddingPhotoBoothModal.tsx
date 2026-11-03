@@ -35,16 +35,16 @@ interface WeddingPhotoBoothModalProps {
 }
 
 const PRESET_BACKGROUNDS = [
-  { id: 'bg1', name: 'Sảnh Tiệc Lộng Lẫy 💎', url: '/media/photos/photo1.svg' },
-  { id: 'bg2', name: 'Nắm Tay Hoàng Hôn 🌅', url: '/media/photos/photo2.svg' },
-  { id: 'bg3', name: 'Lời Hứa Trọn Đời 💍', url: '/media/photos/photo3.svg' },
-  { id: 'bg4', name: 'Nâng Ly Hạnh Phúc 🥂', url: '/media/photos/photo4.svg' },
+  { id: 'bg1', name: 'Phông Kem Ấm 🤍', url: '/media/backdrops/phong_kem.webp' },
+  { id: 'bg2', name: 'Phông Đỏ Song Hỷ 囍', url: '/media/backdrops/phong_do.webp' },
+  { id: 'bg3', name: 'Phông Hồng Phấn 🌸', url: '/media/backdrops/phong_hong.webp' },
+  { id: 'bg4', name: 'Ảnh Cưới Duy ♥ Tâm 💍', url: '/media/photos/anh01.webp' },
 ];
 
 const DEFAULT_CUTOUTS = [
-  { id: 'groom', label: 'Chú Rể Hoàng Duy', src: '/media/cutouts/groom_face.svg', icon: '🤵' },
-  { id: 'bride', label: 'Cô Dâu Thiều Tâm', src: '/media/cutouts/bride_face.svg', icon: '👰' },
-  { id: 'couple', label: 'Cặp Đôi Duy ♥ Tâm', src: '/media/cutouts/couple_faces.svg', icon: '💑' },
+  { id: 'couple1', label: 'Duy ♥ Tâm · Vest trắng', src: '/media/cutouts/capdoi1.webp', icon: '🤍' },
+  { id: 'couple2', label: 'Duy ♥ Tâm · Cầm hoa', src: '/media/cutouts/capdoi2.webp', icon: '💐' },
+  { id: 'couple3', label: 'Duy ♥ Tâm · Áo dài', src: '/media/cutouts/capdoi3.webp', icon: '🏮' },
   { id: 'bouquet', label: 'Hoa Cưới Cầm Tay', src: '/media/cutouts/bouquet_prop.svg', icon: '💐' },
 ];
 
@@ -58,29 +58,18 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
   const [stickersList, setStickersList] = useState<typeof DEFAULT_CUTOUTS>(DEFAULT_CUTOUTS);
   const [activeStickers, setActiveStickers] = useState<StickerItem[]>([
     {
-      id: 'init_groom',
-      src: '/media/cutouts/groom_face.svg',
-      label: 'Chú Rể Hoàng Duy',
-      x: 35,
-      y: 40,
-      scale: 0.95,
-      rotation: 0,
-      flipped: false,
-      opacity: 1,
-    },
-    {
-      id: 'init_bride',
-      src: '/media/cutouts/bride_face.svg',
-      label: 'Cô Dâu Thiều Tâm',
-      x: 65,
-      y: 40,
-      scale: 0.95,
+      id: 'init_couple',
+      src: '/media/cutouts/capdoi2.webp',
+      label: 'Duy ♥ Tâm · Cầm hoa',
+      x: 66,
+      y: 58,
+      scale: 1.35,
       rotation: 0,
       flipped: false,
       opacity: 1,
     },
   ]);
-  const [selectedStickerId, setSelectedStickerId] = useState<string | null>('init_groom');
+  const [selectedStickerId, setSelectedStickerId] = useState<string | null>('init_couple');
   const [filterStyle, setFilterStyle] = useState<'none' | 'warm' | 'rose' | 'vintage' | 'bw'>('warm');
   const [watermarkText, setWatermarkText] = useState('Hoàng Duy ♥ Thiều Tâm · 29/11/2026');
   const [guestCaption, setGuestCaption] = useState(`Ảnh kỷ niệm cùng Duy & Tâm · ${defaultGuestName}`);
@@ -109,7 +98,7 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
       if (typeof event.target?.result === 'string') {
         setBgImageUrl(event.target.result);
         setBgSourceType('upload');
-        showToast('Đã tải ảnh lên thành công! Hãy kéo thả mặt Duy ♥ Tâm vào ảnh.');
+        showToast('Đã tải ảnh lên! Hãy kéo Duy ♥ Tâm đứng cạnh bạn nhé.');
       }
     };
     reader.readAsDataURL(file);
@@ -376,13 +365,13 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
             <span className="text-2xl p-1.5 rounded-2xl bg-rose-100 text-rose-600">📸</span>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-slate-900 font-serif flex items-center gap-2">
-                Góc Chụp Ảnh & Ghép Mặt Cô Dâu Chú Rể
+                Góc Chụp Ảnh Cùng Cô Dâu Chú Rể
                 <span className="text-[11px] font-bold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full">
                   Duy ♥ Tâm
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Tải ảnh của bạn lên hoặc chọn khung cưới, ghép mặt Duy & Tâm, chỉnh góc xoay rồi tải về máy!
+                Tải ảnh của bạn lên hoặc chọn phông nền, thêm Duy & Tâm vào ảnh, chỉnh vị trí rồi tải về máy!
               </p>
             </div>
           </div>
@@ -475,7 +464,7 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
 
             {/* Canvas Hint */}
             <p className="mt-2 text-[11px] text-slate-500 italic text-center">
-              💡 Chạm/Click và kéo để di chuyển mặt Duy & Tâm. Chọn mặt để chỉnh kích thước và góc xoay.
+              💡 Chạm hoặc kéo để di chuyển ảnh Duy & Tâm. Chọn ảnh để chỉnh kích thước và góc xoay.
             </p>
           </div>
 
@@ -525,7 +514,7 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-extrabold text-slate-700 uppercase text-[10px] tracking-wider">
-                  2. Thêm mặt cắt ghép
+                  2. Thêm ảnh Duy & Tâm
                 </span>
                 <label className="text-[10px] text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer">
                   <Plus className="w-3 h-3" />
@@ -616,7 +605,7 @@ export const WeddingPhotoBoothModal: React.FC<WeddingPhotoBoothModalProps> = ({
                     }`}
                   >
                     <FlipHorizontal className="w-3.5 h-3.5" />
-                    <span>Lật mặt</span>
+                    <span>Lật ngang</span>
                   </button>
 
                   <div className="flex-1 flex items-center gap-1.5">
