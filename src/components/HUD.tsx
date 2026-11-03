@@ -18,6 +18,8 @@ import {
   Sparkles,
   Users,
   Camera,
+  Menu,
+  X,
 } from 'lucide-react';
 import type { UserData, HallInfo, LeaderboardEntry, PlayerAction } from '../shared/types.js';
 
@@ -47,6 +49,8 @@ interface HUDProps {
   onSendChat: (text: string) => void;
   onInteractPrompt: () => void;
   chatMessages: Array<{ name: string; text: string; group: string; time: number }>;
+  isTouch?: boolean;
+  onChatOpenChange?: (open: boolean) => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -75,12 +79,33 @@ export const HUD: React.FC<HUDProps> = ({
   onSendChat,
   onInteractPrompt,
   chatMessages,
+  isTouch = false,
+  onChatOpenChange,
 }) => {
+  // Màn hình nhỏ (điện thoại dọc / ngang): gom nút vào menu, chat thu thành biểu tượng
+  const isCompactNow = () => window.innerWidth < 768 || window.innerHeight < 500;
+  const [compact, setCompact] = useState(isCompactNow);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [seenCount, setSeenCount] = useState(chatMessages.length);
+  useEffect(() => {
+    const onResize = () => setCompact(isCompactNow());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  useEffect(() => {
+    if (chatOpen || !compact) setSeenCount(chatMessages.length);
+  }, [chatOpen, compact, chatMessages.length]);
+  const unread = Math.max(0, chatMessages.length - seenCount);
+  // Báo cho App biết chat đang mở (để ẩn joystick, tránh che ô nhập tin)
+  useEffect(() => {
+    onChatOpenChange?.(compact && chatOpen);
+  }, [compact, chatOpen]);
   const [showHallDropdown, setShowHallDropdown] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isChatExpanded, setIsChatExpanded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [top3Collapsed, setTop3Collapsed] = useState(false);
+  const [top3Collapsed, setTop3Collapsed] = useState(isCompactNow);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
 
   const toggleFullscreen = () => {
@@ -192,13 +217,13 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
 
           {/* Compact Countdown Line */}
-          <div className="px-2.5 py-0.5 rounded-full bg-rose-950/60 text-white text-[11px] font-medium backdrop-blur-sm self-start flex items-center gap-1.5">
+          <div className={`px-2.5 py-0.5 rounded-full bg-rose-950/60 text-white text-[11px] font-medium backdrop-blur-sm self-start items-center gap-1.5 ${compact ? 'hidden' : 'flex'}`}>
             <span className="text-amber-300">💍</span>
             <span>{countdownText}</span>
           </div>
 
           {/* Compact "🏆 TOP 3 + Hạng của bạn" Widget */}
-          <div className="bg-white/90 backdrop-blur-md border border-amber-200/80 rounded-2xl p-2 shadow-md w-52 sm:w-60">
+          <div className={`bg-white/90 backdrop-blur-md border border-amber-200/80 rounded-2xl p-2 shadow-md ${compact ? 'w-44' : 'w-52 sm:w-60'}`}>
             <div
               onClick={() => setTop3Collapsed(!top3Collapsed)}
               className="flex items-center justify-between cursor-pointer"
@@ -234,7 +259,8 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         </div>
 
-        {/* Top-Right Action Controls */}
+        {/* Top-Right Action Controls (máy tính) */}
+        {!compact && (
         <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
           {/* Mini-Games Direct Button */}
           <button
@@ -327,6 +353,77 @@ export const HUD: React.FC<HUDProps> = ({
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
+        )}
+
+        {/* Top-Right (điện thoại): điểm + nhạc + menu ☰ */}
+        {compact && (
+          <div className="relative flex items-center gap-1.5 pointer-events-auto">
+            <button
+              onClick={onOpenShop}
+              className="px-2.5 py-1.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md flex items-center gap-1 font-extrabold text-xs active:scale-95"
+            >
+              <Heart className="w-3.5 h-3.5 fill-white" />
+              <span>{user.availableScore}</span>
+            </button>
+            <button
+              onClick={onToggleVideoAudio}
+              aria-label="Bật/tắt nhạc"
+              className={`px-2 py-1.5 rounded-2xl text-xs font-bold shadow-md flex items-center gap-1 ${
+                soundBlocked
+                  ? 'bg-rose-600 text-white animate-pulse'
+                  : videoAudioOn
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-white/95 text-rose-600 border border-rose-300'
+              }`}
+            >
+              {videoAudioOn && !soundBlocked ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              {soundBlocked && <span>Bật nhạc</span>}
+            </button>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className={`p-2 rounded-2xl shadow-md border transition-colors ${
+                menuOpen ? 'bg-rose-500 text-white border-rose-500' : 'bg-white/95 text-slate-700 border-slate-200'
+              }`}
+              aria-label="Mở menu"
+            >
+              {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+
+            {menuOpen && (
+              <div className="absolute top-11 right-0 w-56 max-h-[70vh] overflow-y-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-rose-200 p-1.5 z-50 animate-fade-in">
+                {[
+                  { icon: <span className="text-base leading-none">🎮</span>, label: 'Trò chơi nhận điểm', run: onOpenGames },
+                  { icon: <Camera className="w-4 h-4 text-rose-500" />, label: 'Chụp ảnh cùng Duy & Tâm', run: onOpenPhotoBooth },
+                  { icon: <Trophy className="w-4 h-4 text-amber-500" />, label: 'Bảng xếp hạng', run: onOpenLeaderboard },
+                  { icon: <Edit3 className="w-4 h-4 text-purple-500" />, label: 'Đổi tên & trang phục', run: onOpenProfileEdit },
+                  { icon: <Video className="w-4 h-4 text-rose-500" />, label: 'Xem video lớn', run: onOpenVideoModal },
+                  {
+                    icon: isNight ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />,
+                    label: isNight ? 'Chuyển ban ngày' : 'Chuyển ban đêm',
+                    run: onToggleNight,
+                  },
+                  {
+                    icon: isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />,
+                    label: isFullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình',
+                    run: toggleFullscreen,
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      item.run();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm font-semibold text-slate-700 hover:bg-rose-50 active:bg-rose-100"
+                  >
+                    <span className="w-5 flex justify-center">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Proximity Interaction Prompt Center */}
@@ -338,15 +435,47 @@ export const HUD: React.FC<HUDProps> = ({
           >
             <Sparkles className="w-5 h-5 text-yellow-200" />
             <span>{activePrompt}</span>
-            <span className="text-xs opacity-80">(hoặc nhấn E)</span>
+            {!isTouch && <span className="text-xs opacity-80">(hoặc nhấn E)</span>}
           </button>
         </div>
       )}
 
       {/* Bottom Area: Chat (Left) & Actions Bar (Center) */}
       <div className="flex flex-col sm:flex-row items-end justify-between gap-3 w-full">
-        {/* Chat Box (Bottom-Left) */}
-        <div className="w-full sm:w-80 pointer-events-auto">
+        {/* Chat: máy tính luôn hiện | điện thoại chạm biểu tượng 💬 mới mở */}
+        {compact && !chatOpen && (
+          <button
+            onClick={() => setChatOpen(true)}
+            className="fixed z-40 pointer-events-auto w-12 h-12 rounded-full bg-white/95 border border-rose-200 shadow-lg flex items-center justify-center text-rose-600 active:scale-95"
+            style={{ left: 16, bottom: isTouch ? 168 : 16 }}
+            aria-label="Mở khung chat"
+          >
+            <MessageCircle className="w-6 h-6" />
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </button>
+        )}
+        {(!compact || chatOpen) && (
+        <div
+          className={
+            compact
+              ? 'fixed z-50 left-2 right-2 bottom-2 max-w-md p-2 rounded-2xl bg-white/95 backdrop-blur-md border border-rose-200 shadow-2xl pointer-events-auto'
+              : 'w-full sm:w-80 pointer-events-auto'
+          }
+        >
+          {compact && (
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                <MessageCircle className="w-3.5 h-3.5 text-rose-500" /> Trò chuyện
+              </span>
+              <button onClick={() => setChatOpen(false)} className="p-1 rounded-full hover:bg-slate-100 text-slate-500" aria-label="Đóng chat">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {/* Recent Messages Window */}
           <div
             className={`transition-all overflow-hidden rounded-2xl bg-white/85 backdrop-blur-md border border-rose-100 shadow-lg p-2.5 ${
@@ -398,13 +527,25 @@ export const HUD: React.FC<HUDProps> = ({
             </button>
           </form>
         </div>
+        )}
 
         {/* Action Bar (Bottom-Center / Bottom-Right) */}
-        <div className="relative flex items-center max-w-full pointer-events-auto self-center sm:self-end">
+        <div
+          className={
+            compact
+              ? 'fixed z-40 right-2 bottom-2 flex items-center pointer-events-auto'
+              : 'relative flex items-center max-w-full pointer-events-auto self-center sm:self-end'
+          }
+          style={
+            compact
+              ? { maxWidth: isTouch ? 'calc(100vw - 168px)' : 'calc(100vw - 16px)', marginBottom: 'env(safe-area-inset-bottom, 0px)' }
+              : undefined
+          }
+        >
           {/* Mobile Scroll Left button */}
           <button
             onClick={() => scrollActionBar('left')}
-            className="sm:hidden p-1.5 rounded-full bg-white/80 shadow text-slate-600 mr-1"
+            className={`${compact ? 'hidden' : 'sm:hidden'} p-1.5 rounded-full bg-white/80 shadow text-slate-600 mr-1`}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -424,9 +565,11 @@ export const HUD: React.FC<HUDProps> = ({
                     onPerformAction(act.id);
                   }
                 }}
-                className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-rose-50 hover:text-rose-600 text-slate-700 transition-all min-w-[58px] cursor-pointer active:scale-90"
+                className={`flex flex-col items-center justify-center rounded-2xl hover:bg-rose-50 hover:text-rose-600 text-slate-700 transition-all cursor-pointer active:scale-90 ${
+                  compact ? 'p-1.5 min-w-[50px]' : 'p-2 min-w-[58px]'
+                }`}
               >
-                <span className="text-xl sm:text-2xl">{act.icon}</span>
+                <span className={compact ? 'text-lg' : 'text-xl sm:text-2xl'}>{act.icon}</span>
                 <span className="text-[10px] font-bold mt-0.5 whitespace-nowrap">{act.label}</span>
               </button>
             ))}
@@ -435,7 +578,7 @@ export const HUD: React.FC<HUDProps> = ({
           {/* Mobile Scroll Right button */}
           <button
             onClick={() => scrollActionBar('right')}
-            className="sm:hidden p-1.5 rounded-full bg-white/80 shadow text-slate-600 ml-1"
+            className={`${compact ? 'hidden' : 'sm:hidden'} p-1.5 rounded-full bg-white/80 shadow text-slate-600 ml-1`}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
