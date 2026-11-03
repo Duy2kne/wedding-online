@@ -195,24 +195,111 @@ class SoundManager {
     });
   }
 
-  public playApplause() {
+  // ---------- Tiếng vỗ tay ----------
+  private noiseBuffer: AudioBuffer | null = null;
+  private clappers = new Map<string, { volume: number; timer: ReturnType<typeof setInterval>; until: number }>();
+
+  /** Mở khoá âm thanh (gọi trong sự kiện chạm/bấm đầu tiên, bắt buộc trên iPhone) */
+  public unlock() {
+    this.initContext();
+  }
+
+  private getNoise(): AudioBuffer | null {
+    if (!this.ctx) return null;
+    if (!this.noiseBuffer) {
+      const len = Math.floor(this.ctx.sampleRate * 0.25);
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noiseBuffer = buf;
+    }
+    return this.noiseBuffer;
+  }
+
+  /** Một tiếng "bộp" của 2 lòng bàn tay: nhiễu trắng ngắn qua lọc dải + tắt nhanh */
+  private clapAt(t: number, volume: number) {
+    const ctx = this.ctx;
+    const noise = this.getNoise();
+    if (!ctx || !noise || volume <= 0) return;
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.playbackRate.value = 0.9 + Math.random() * 0.2;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 1100 + Math.random() * 900;
+    band.Q.value = 0.9 + Math.random() * 0.6;
+    const high = ctx.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 450;
+    const gain = ctx.createGain();
+    const peak = this.sfxVolume * volume * (0.75 + Math.random() * 0.25);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(peak, t + 0.002);
+    // 2 lớp tắt dần: tiếng "bốp" chính + chút vang phòng
+    gain.gain.exponentialRampToValueAtTime(peak * 0.25, t + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    src.connect(band);
+    band.connect(high);
+    high.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(t, Math.random() * 0.1, 0.14);
+  }
+
+  /** Một người vỗ tay đều tay (key = id nhân vật). Gọi lại để cập nhật âm lượng theo khoảng cách. */
+  public startClapping(key: string, volume = 1) {
+    this.initContext();
+    if (!this.ctx) return;
+    const existing = this.clappers.get(key);
+    if (existing) {
+      existing.volume = volume;
+      return;
+    }
+    const entry = { volume, until: Date.now() + 15000, timer: 0 as unknown as ReturnType<typeof setInterval> };
+    // Nhịp ~3.2 lần/giây, khớp với hoạt ảnh vỗ tay của nhân vật
+    const beat = 0.31;
+    let next = this.ctx.currentTime + 0.05;
+    const schedule = () => {
+      if (!this.ctx) return;
+      if (Date.now() > entry.until) {
+        this.stopClapping(key);
+        return;
+      }
+      while (next < this.ctx.currentTime + 0.35) {
+        this.clapAt(next, entry.volume);
+        next += beat + (Math.random() - 0.5) * 0.03;
+      }
+    };
+    schedule();
+    entry.timer = setInterval(schedule, 120);
+    this.clappers.set(key, entry);
+  }
+
+  public stopClapping(key: string) {
+    const c = this.clappers.get(key);
+    if (!c) return;
+    clearInterval(c.timer);
+    this.clappers.delete(key);
+  }
+
+  public isClapping(key: string) {
+    return this.clappers.has(key);
+  }
+
+  /** Cả hội trường vỗ tay (tung hoa, chúc mừng...): nhiều người vỗ lệch nhịp, to dần rồi nhỏ dần */
+  public playApplause(duration = 3) {
     this.initContext();
     if (!this.ctx || this.sfxVolume <= 0) return;
-    // Synthesize gentle clapping burst
     const now = this.ctx.currentTime;
-    for (let i = 0; i < 18; i++) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      const f = 200 + Math.random() * 400;
-      const t = now + i * 0.08 + Math.random() * 0.04;
-      osc.frequency.setValueAtTime(f, t);
-      gain.gain.setValueAtTime(this.sfxVolume * (0.15 + Math.random() * 0.15), t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.12);
+    const people = 14;
+    for (let p = 0; p < people; p++) {
+      const rate = 0.2 + Math.random() * 0.12; // mỗi người một nhịp riêng
+      let t = now + Math.random() * 0.3;
+      while (t < now + duration) {
+        const k = (t - now) / duration;
+        const env = Math.min(1, k * 5) * Math.min(1, (1 - k) * 2.5); // to dần rồi nhỏ dần
+        this.clapAt(t, 0.32 * env);
+        t += rate + (Math.random() - 0.5) * 0.05;
+      }
     }
   }
 
