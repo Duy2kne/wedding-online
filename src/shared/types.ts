@@ -129,4 +129,7 @@ export interface WeddingConfig {
     localFile?: string;
   };
   hashtag: string;
+  /** Ba mẹ hai họ (hiện trên màn hình bên phải sân khấu) */
+  groomParents?: { father: string; mother: string };
+  brideParents?: { father: string; mother: string };
 }
