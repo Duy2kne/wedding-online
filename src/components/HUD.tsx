@@ -29,6 +29,7 @@ interface HUDProps {
   countdownText: string;
   isNight: boolean;
   nearVideo: boolean;
+  soundBlocked?: boolean;
   videoAudioOn: boolean;
   activePrompt: string | null;
   debugStats?: { fps: number; drawCalls: number };
@@ -56,6 +57,7 @@ export const HUD: React.FC<HUDProps> = ({
   countdownText,
   isNight,
   nearVideo,
+  soundBlocked = false,
   videoAudioOn,
   activePrompt,
   debugStats,
@@ -291,20 +293,21 @@ export const HUD: React.FC<HUDProps> = ({
             {isNight ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
           </button>
 
-          {/* Video Audio Button (active when near stage) */}
-          {nearVideo && (
-            <button
-              onClick={onToggleVideoAudio}
-              className={`px-2.5 py-1.5 rounded-2xl text-xs font-bold shadow-md flex items-center gap-1 transition-all ${
-                videoAudioOn
-                  ? 'bg-rose-500 text-white animate-pulse'
-                  : 'bg-white/95 text-rose-600 border border-rose-300'
-              }`}
-            >
-              {videoAudioOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Tiếng Video</span>
-            </button>
-          )}
+          {/* Nhạc của sảnh = tiếng video cưới (luôn hiện nút bật/tắt) */}
+          <button
+            onClick={onToggleVideoAudio}
+            title={videoAudioOn && !soundBlocked ? 'Tắt nhạc' : 'Bật nhạc'}
+            className={`px-2.5 py-1.5 rounded-2xl text-xs font-bold shadow-md flex items-center gap-1 transition-all ${
+              soundBlocked
+                ? 'bg-rose-600 text-white animate-pulse'
+                : videoAudioOn
+                ? 'bg-rose-500 text-white'
+                : 'bg-white/95 text-rose-600 border border-rose-300'
+            }`}
+          >
+            {videoAudioOn && !soundBlocked ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span className={soundBlocked ? 'inline' : 'hidden sm:inline'}>{soundBlocked ? 'Chạm để bật nhạc' : 'Nhạc video'}</span>
+          </button>
 
           {/* Enlarged 2D Video Modal */}
           <button
