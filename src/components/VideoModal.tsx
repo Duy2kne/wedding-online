@@ -49,7 +49,7 @@ export const VideoModal: React.FC<VideoModalProps> = ({
         <div className="relative w-full pb-[56.25%] bg-black">
           <iframe
             className="absolute inset-0 w-full h-full border-0"
-            src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&controls=1&cc_load_policy=0&cc_lang_pref=off&hl=vi&start=${startSecond}`}
+            src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&controls=1&cc_load_policy=0&cc_lang_pref=off&hl=vi&start=${startSecond}&loop=1&playlist=${youtubeId}`}
             title="Video Cưới Duy & Tâm"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
