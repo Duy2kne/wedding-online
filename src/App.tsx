@@ -41,6 +41,7 @@ export function App() {
   const [nearVideo, setNearVideo] = useState(false);
   const [videoAudioOn, setVideoAudioOn] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const videoFailed = useRef(false);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [debugStats, setDebugStats] = useState<{ fps: number; drawCalls: number } | undefined>(undefined);
@@ -83,7 +84,11 @@ export function App() {
   const actionStartedAt = useRef(0);
   // Giá trị UI cập nhật từ vòng lặp 3D: so sánh trước khi setState để không render lại 60 lần/giây
   const uiCache = useRef<{ nearVideo: boolean; prompt: string | null }>({ nearVideo: false, prompt: null });
-  const isMobile = useRef(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+  // Điện thoại / máy tính bảng (kể cả iPad báo là Mac): có màn hình cảm ứng làm thiết bị chính
+  const isMobile = useRef(
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && window.matchMedia?.('(pointer: coarse)').matches)
+  );
 
   // Get or initialize persistent uid
   const getUid = () => {
@@ -410,8 +415,12 @@ export function App() {
       keysDown.current[e.code] = false;
     };
 
+    // Chỉ xoay camera khi bấm/chạm vào khung 3D (không phải nút, chat, joystick)
+    const isSceneTarget = (t: EventTarget | null) =>
+      t instanceof HTMLCanvasElement && !!containerRef.current && containerRef.current.contains(t);
+
     const onMouseDown = (e: MouseEvent) => {
-      if (e.button === 0) {
+      if (e.button === 0 && isSceneTarget(e.target)) {
         isMouseDown.current = true;
         mousePrev.current = { x: e.clientX, y: e.clientY };
       }
@@ -436,6 +445,52 @@ export function App() {
       cameraAngle.current.distance = Math.max(3.5, Math.min(18, cameraAngle.current.distance + e.deltaY * 0.01));
     };
 
+    // Cảm ứng: 1 ngón kéo để xoay camera, 2 ngón chụm/mở để zoom.
+    // Theo dõi từng ngón riêng -> vừa giữ joystick vừa xoay camera bằng ngón khác được.
+    const camTouches = new Map<number, { x: number; y: number }>();
+    let pinchDist = 0;
+    const pinchSpan = () => {
+      const pts = [...camTouches.values()];
+      return pts.length >= 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) {
+        if (isSceneTarget(t.target)) camTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      if (camTouches.size >= 2) pinchDist = pinchSpan();
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      let moved = false;
+      for (const t of Array.from(e.changedTouches)) {
+        const prev = camTouches.get(t.identifier);
+        if (!prev) continue;
+        moved = true;
+        if (camTouches.size === 1) {
+          const dx = t.clientX - prev.x;
+          const dy = t.clientY - prev.y;
+          cameraAngle.current.yaw -= dx * 0.008;
+          cameraAngle.current.pitch = Math.max(0.05, Math.min(1.2, cameraAngle.current.pitch + dy * 0.006));
+        }
+        camTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      if (moved && camTouches.size >= 2) {
+        const d = pinchSpan();
+        if (pinchDist > 0) {
+          cameraAngle.current.distance = Math.max(3.5, Math.min(18, cameraAngle.current.distance * (pinchDist / d)));
+        }
+        pinchDist = d;
+      }
+      if (moved && e.cancelable) e.preventDefault(); // chặn trình duyệt cuộn/zoom trang
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) camTouches.delete(t.identifier);
+      pinchDist = camTouches.size >= 2 ? pinchSpan() : 0;
+    };
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('mousedown', onMouseDown);
@@ -444,6 +499,10 @@ export function App() {
     window.addEventListener('wheel', onWheel, { passive: true });
 
     return () => {
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', onTouchEnd);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('mousedown', onMouseDown);
@@ -752,7 +811,7 @@ export function App() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-[#fffbf0] via-[#fff5f5] to-[#fef2f2] select-none">
       {/* 3D Scene Viewport Container */}
-      <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden" />
+      <div ref={containerRef} className="absolute inset-0 z-0 overflow-hidden" style={{ touchAction: 'none' }} />
 
       {/* Waiting Lobby Modal (First Screen) */}
       {inLobby && config && (
@@ -801,11 +860,16 @@ export function App() {
             onSendChat={(msg) => socketRef.current?.emit('chat', msg)}
             onInteractPrompt={handleInteractWithNearest}
             chatMessages={chatMessages}
+            isTouch={isMobile.current}
+            onChatOpenChange={(open) => {
+              setMobileChatOpen(open);
+              if (open) joystickVector.current = { dx: 0, dy: 0 };
+            }}
           />
 
           {/* Virtual Joystick for Mobile Devices */}
-          {isMobile.current && (
-            <div className="fixed bottom-6 left-6 z-40 pointer-events-auto">
+          {isMobile.current && !mobileChatOpen && (
+            <div className="fixed bottom-4 left-4 z-40 pointer-events-auto" style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}>
               <VirtualJoystick
                 onMove={(dx, dy) => {
                   joystickVector.current = { dx, dy };
