@@ -40,6 +40,8 @@ export function App() {
   const [isNight, setIsNight] = useState(false);
   const [nearVideo, setNearVideo] = useState(false);
   const [videoAudioOn, setVideoAudioOn] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  const videoFailed = useRef(false);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [debugStats, setDebugStats] = useState<{ fps: number; drawCalls: number } | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -171,8 +173,7 @@ export function App() {
       setLeaderboard(data.leaderboard || []);
       setInLobby(false);
 
-      // Start music after user entered (autoplay compliant)
-      soundManager.playMusic();
+      // Nhạc của sảnh = tiếng của video cưới (bật sau khi khách bấm "Vào dự tiệc")
 
       // Initialize 3D Hall Scene
       if (containerRef.current && config) {
@@ -184,6 +185,17 @@ export function App() {
           config
         );
         hall3DRef.current = hallScene;
+
+        hallScene.onSoundBlocked = () => setSoundBlocked(true);
+        hallScene.onVideoError = () => {
+          // Video lỗi -> dùng nhạc nền dự phòng để sảnh không im lặng
+          videoFailed.current = true;
+          hallScene.setVideoSound(false);
+          setVideoAudioOn(true);
+          soundManager.playMusic();
+        };
+        hallScene.setVideoSound(true);
+        setVideoAudioOn(true);
 
         // Synchronize initial flowers using separate syncFlowers
         hallScene.syncFlowers(data.flowers || []);
@@ -721,22 +733,20 @@ export function App() {
   }, [debugStats]);
 
   // Video audio toggle handler
+  // Bật / tắt nhạc (tiếng của video cưới). Gọi trong sự kiện bấm để iPhone cho phép phát tiếng.
   const handleToggleVideoAudio = () => {
     if (!hall3DRef.current) return;
-    const iframe = hall3DRef.current.getYoutubeIframe();
-    if (!iframe) return;
-
-    if (!videoAudioOn) {
-      // Unmute YouTube video and lower background wedding music
-      iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-      iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [80] }), '*');
-      soundManager.setMusicVolume(0.12);
-      setVideoAudioOn(true);
-    } else {
-      iframe.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
-      soundManager.setMusicVolume(0.5);
-      setVideoAudioOn(false);
+    const next = soundBlocked ? true : !videoAudioOn;
+    if (videoFailed.current) {
+      // video lỗi: nút điều khiển nhạc nền dự phòng
+      if (next) soundManager.playMusic();
+      else soundManager.pauseMusic();
+      setVideoAudioOn(next);
+      return;
     }
+    hall3DRef.current.setVideoSound(next);
+    setVideoAudioOn(next);
+    setSoundBlocked(false);
   };
 
   return (
@@ -765,6 +775,7 @@ export function App() {
             countdownText={countdownText}
             isNight={isNight}
             nearVideo={nearVideo}
+            soundBlocked={soundBlocked}
             videoAudioOn={videoAudioOn}
             activePrompt={activePrompt}
             debugStats={debugStats}
@@ -773,7 +784,11 @@ export function App() {
             onOpenLeaderboard={() => setShowLeaderboard(true)}
             onOpenProfileEdit={() => setShowProfileEdit(true)}
             onOpenGuestbook={() => setShowGuestbook(true)}
-            onOpenVideoModal={() => setShowVideoModal(true)}
+            onOpenVideoModal={() => {
+              // mở khung xem lớn -> tắt tiếng video trong sảnh để không bị 2 tiếng chồng nhau
+              hall3DRef.current?.setVideoSound(false);
+              setShowVideoModal(true);
+            }}
             onOpenGames={() => setShowGames('jigsaw')}
             onOpenPhotoBooth={() => setShowPhotoBooth(true)}
             onToggleNight={() => {
@@ -888,7 +903,11 @@ export function App() {
         <VideoModal
           youtubeId={config.video?.youtubeId || 'uIlNkfn6NcA'}
           videoTime={0}
-          onClose={() => setShowVideoModal(false)}
+          onClose={() => {
+            setShowVideoModal(false);
+            // đóng khung lớn -> trả lại tiếng cho video trong sảnh
+            if (videoAudioOn) hall3DRef.current?.setVideoSound(true);
+          }}
         />
       )}
 
