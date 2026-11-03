@@ -118,10 +118,18 @@ export class WeddingHall3D {
   private ytReady = false;
   private videoSoundWanted = false;
   private lastSoundApply = 0;
+  private ytState = -1; // -1 chưa chạy, 0 hết, 1 đang phát, 2 tạm dừng, 3 đang tải, 5 chờ
+  private ytMuted = true;
+  private soundCheckTimer?: ReturnType<typeof setInterval>;
+  private soundBlocked = false;
+  private keepAliveTimer?: ReturnType<typeof setInterval>;
+  private onUserGesture?: () => void;
   /** Gọi khi trình duyệt không cho phát tiếng video (cần khách bấm nút) */
   public onSoundBlocked?: () => void;
   /** Gọi khi video lỗi (bị xoá / tắt nhúng) để chuyển sang nhạc nền dự phòng */
   public onVideoError?: (code: number) => void;
+  /** Gọi khi đã bật được tiếng video */
+  public onSoundOk?: () => void;
 
   private hemiLight!: THREE.HemisphereLight;
   private ambientLight!: THREE.AmbientLight;
@@ -928,15 +936,20 @@ export class WeddingHall3D {
       try {
         const msg = JSON.parse(e.data);
         // Trình phát đã sẵn sàng -> áp trạng thái tiếng mong muốn (bật nhạc video)
-        if (!this.ytReady && (msg.event === 'onReady' || msg.event === 'infoDelivery' || msg.event === 'initialDelivery')) {
+        if (!this.ytReady && msg.event === 'onReady') {
           this.ytReady = true;
           this.applyVideoSound();
         }
         if (msg.event === 'onError') this.onVideoError?.(Number(msg.info));
-        // Muốn có tiếng mà YouTube vẫn báo đang tắt tiếng -> trình duyệt chặn (thường là iPhone)
-        if (msg.event === 'infoDelivery' && msg.info && typeof msg.info.muted === 'boolean') {
-          const blocked = this.videoSoundWanted && msg.info.muted;
-          if (blocked && Date.now() - this.lastSoundApply > 2500) this.onSoundBlocked?.();
+        if (msg.event === 'onStateChange' && typeof msg.info === 'number') this.ytState = msg.info;
+        if (msg.event === 'infoDelivery' && msg.info) {
+          if (typeof msg.info.playerState === 'number') this.ytState = msg.info.playerState;
+          if (typeof msg.info.muted === 'boolean') this.ytMuted = msg.info.muted;
+        }
+        // Đang phát và có tiếng -> báo đã bật được nhạc
+        if (this.videoSoundWanted && this.soundBlocked && this.ytState === 1 && !this.ytMuted) {
+          this.soundBlocked = false;
+          this.onSoundOk?.();
         }
         const ended =
           (msg.event === 'onStateChange' && msg.info === 0) ||
@@ -948,6 +961,29 @@ export class WeddingHall3D {
       } catch {}
     };
     window.addEventListener('message', this.onYoutubeMessage);
+
+    // Lần chạm/bấm tiếp theo của khách (kể cả joystick) -> thử bật tiếng lại.
+    // Điện thoại chỉ cho video có tiếng khi có thao tác của người dùng.
+    // Chỉ tự thử 1 lần (tránh video khựng mỗi lần chạm joystick trên iPhone); sau đó dùng nút "Bật nhạc"
+    let gestureRetried = false;
+    this.onUserGesture = () => {
+      if (gestureRetried || !this.ytReady) return;
+      if (this.videoSoundWanted && this.soundBlocked) {
+        gestureRetried = true;
+        this.applyVideoSound();
+      }
+    };
+    window.addEventListener('pointerdown', this.onUserGesture, true);
+    window.addEventListener('touchend', this.onUserGesture, true);
+
+    // Giữ video luôn chạy: nếu bị dừng (do trình duyệt chặn tiếng, mất mạng...) thì phát tiếp
+    this.keepAliveTimer = setInterval(() => {
+      if (!this.ytReady) return;
+      if (this.ytState === 2 || this.ytState === -1 || this.ytState === 5) {
+        if (this.videoSoundWanted && !this.ytMuted) this.ytSend?.('mute');
+        this.ytSend?.('playVideo');
+      }
+    }, 3000);
     iframe.addEventListener('load', () => {
       disableCaptions();
       setTimeout(disableCaptions, 1500);
@@ -955,6 +991,12 @@ export class WeddingHall3D {
       try {
         iframe.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'wedding-yt-player' }), '*');
       } catch {}
+      setTimeout(() => {
+        if (!this.ytReady) {
+          this.ytReady = true;
+          this.applyVideoSound();
+        }
+      }, 5000);
     });
     const cssObj = new CSS3DObject(iframe);
     cssObj.scale.set(0.01, 0.01, 0.01);
@@ -976,12 +1018,44 @@ export class WeddingHall3D {
   private applyVideoSound() {
     if (!this.ytSend) return;
     this.lastSoundApply = Date.now();
+    if (this.soundCheckTimer) clearInterval(this.soundCheckTimer);
     if (this.videoSoundWanted) {
       this.ytSend('unMute');
       this.ytSend('setVolume', [85]);
       this.ytSend('playVideo');
+      if (!this.ytReady) return; // chưa sẵn sàng: sẽ thử lại khi YouTube báo onReady
+      // Theo dõi vài giây: điện thoại chặn tiếng thì video bị DỪNG hoặc vẫn tắt tiếng
+      // -> quay về tắt tiếng để video vẫn chạy, báo khách bấm nút để bật nhạc
+      const started = Date.now();
+      const blocked = () => {
+        if (this.soundCheckTimer) clearInterval(this.soundCheckTimer);
+        this.ytSend?.('mute');
+        this.ytSend?.('playVideo');
+        this.soundBlocked = true;
+        this.onSoundBlocked?.();
+      };
+      this.soundCheckTimer = setInterval(() => {
+        if (!this.videoSoundWanted) {
+          clearInterval(this.soundCheckTimer);
+          return;
+        }
+        const elapsed = Date.now() - started;
+        if (this.ytState === 1 && !this.ytMuted) {
+          clearInterval(this.soundCheckTimer);
+          this.soundBlocked = false;
+          this.onSoundOk?.();
+        } else if (this.ytState === 2 && elapsed > 600) {
+          blocked(); // bị dừng vì bật tiếng không được phép
+        } else if (this.ytState === 1 && this.ytMuted && elapsed > 3000) {
+          blocked(); // vẫn chạy nhưng không bỏ tắt tiếng được
+        } else if (elapsed > 8000) {
+          clearInterval(this.soundCheckTimer);
+          if (this.ytState !== 1) blocked();
+        }
+      }, 400);
     } else {
       this.ytSend('mute');
+      this.ytSend('playVideo');
     }
   }
 
@@ -1894,6 +1968,12 @@ export class WeddingHall3D {
   public dispose() {
     window.removeEventListener('resize', this.onResize);
     if (this.onYoutubeMessage) window.removeEventListener('message', this.onYoutubeMessage);
+    if (this.onUserGesture) {
+      window.removeEventListener('pointerdown', this.onUserGesture, true);
+      window.removeEventListener('touchend', this.onUserGesture, true);
+    }
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    if (this.soundCheckTimer) clearInterval(this.soundCheckTimer);
     this.npcGroom?.dispose();
     this.npcBride?.dispose();
     this.renderer.dispose();
