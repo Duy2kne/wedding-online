@@ -1,11 +1,18 @@
+/*
+ * Bảng màu 2 sảnh. Nguyên tắc: nền trung tính ấm (ngà, kem, be) chiếm phần lớn,
+ * 1 màu nhấn trầm (đỏ rượu vang / hồng đất) và vàng champagne cho chi tiết kim loại.
+ * Tránh trắng tinh (#fff) và màu bão hoà mạnh để sảnh không bị chói dưới đèn.
+ */
 export interface HallThemeConfig {
   id: 'diamond' | 'sophia';
   name: string;
-  floorColor: number;
-  floorRoughness: number;
-  floorMetalness: number;
+  floorBase: string; // màu nền đá (canvas)
+  floorVein: string; // vân đá
+  floorGrout: string; // đường ron gạch
   wallColor: number;
+  wainscotColor: number; // ốp chân tường
   ceilingColor: number;
+  drapeColor: number; // rèm vải
   carpetColor: number;
   carpetBorderColor: number;
   ambientColor: number;
@@ -17,6 +24,8 @@ export interface HallThemeConfig {
   chairBowColor: number;
   tableClothColor: number;
   tableOverlayColor: number;
+  rugColor: string; // thảm tròn dưới bàn
+  rugRing: string;
   curtainColor: number;
   flowerPalette: {
     primary: number;
@@ -24,6 +33,9 @@ export interface HallThemeConfig {
     accent: number;
     leaf: number;
   };
+  screenBg: string; // nền màn hình phụ (đếm ngược, bảng điểm)
+  screenAccent: string;
+  screenText: string;
   chandelierStyle: 'crystal' | 'fairy';
   description: string;
   badge: string;
@@ -33,61 +45,75 @@ export const HALL_THEMES: Record<'diamond' | 'sophia', HallThemeConfig> = {
   diamond: {
     id: 'diamond',
     name: 'Sảnh Diamond 💎',
-    floorColor: 0xf5efe6, // Warm Crema Marfil polished marble
-    floorRoughness: 0.12,
-    floorMetalness: 0.05,
-    wallColor: 0xf8fafc,
-    ceilingColor: 0xffffff,
-    carpetColor: 0x991b1b, // Royal Ruby Velvet carpet
-    carpetBorderColor: 0xf59e0b, // Bright gold trim
-    ambientColor: 0xfffbf5, // Warm bright ambient
-    ambientIntensity: 2.2,
-    primaryLightColor: 0xffffff,
-    accentLightColor: 0x38bdf8, // Ice blue sparkling accent
-    chairFrameColor: 0xd4af37, // Gilded Champagne Gold Tiffany frame
-    chairClothColor: 0x1e3a8a, // Royal Sapphire Velvet cushion (bold contrast against floor)
-    chairBowColor: 0x38bdf8, // Ice blue satin ribbon
-    tableClothColor: 0xfffdf7, // Pearl Ivory Silk
-    tableOverlayColor: 0xd4af37, // Gold runner
-    curtainColor: 0xf8fafc,
+    floorBase: '#e7dfd3',
+    floorVein: 'rgba(150, 128, 104, 0.16)',
+    floorGrout: 'rgba(160, 136, 100, 0.35)',
+    wallColor: 0xe9dfd2,
+    wainscotColor: 0xdccfbd,
+    ceilingColor: 0xd9cfc2,
+    drapeColor: 0xf0e7da,
+    carpetColor: 0x6e2230, // đỏ rượu vang
+    carpetBorderColor: 0xc4a467,
+    ambientColor: 0xfff4e6,
+    ambientIntensity: 0.25,
+    primaryLightColor: 0xfff0dc,
+    accentLightColor: 0xffe2b8,
+    chairFrameColor: 0xc9a660,
+    chairClothColor: 0xe9e0d2,
+    chairBowColor: 0xb89a63,
+    tableClothColor: 0xf3ece1,
+    tableOverlayColor: 0xbf9f62,
+    rugColor: '#cfc1ad',
+    rugRing: '#a88a58',
+    curtainColor: 0xf0e7da,
     flowerPalette: {
-      primary: 0xffffff, // White roses
-      secondary: 0xbae6fd, // Phalaenopsis orchids
-      accent: 0xfef08a, // Soft golden centers
-      leaf: 0x22c55e,
+      primary: 0xf7f1e8, // hồng trắng
+      secondary: 0xe9c7c3, // hồng phấn
+      accent: 0xdcc38c,
+      leaf: 0x6f8a5c,
     },
+    screenBg: '#2a1d22',
+    screenAccent: '#cfae6c',
+    screenText: '#f3e7d6',
     chandelierStyle: 'crystal',
-    description: 'Sang trọng hiện đại · Trắng, Bạc & Xanh băng pha lê',
+    description: 'Sang trọng cổ điển · Ngà, Champagne & Đỏ rượu vang',
     badge: '💎 Kim Cương',
   },
   sophia: {
     id: 'sophia',
     name: 'Sảnh Sophia 🌸',
-    floorColor: 0xf7efe4, // Warm Tuscan Champagne Travertine
-    floorRoughness: 0.14,
-    floorMetalness: 0.05,
-    wallColor: 0xffedd5,
-    ceilingColor: 0xfffbf5,
-    carpetColor: 0xbe123c, // Romantic deep rose velvet carpet
-    carpetBorderColor: 0xf59e0b, // Warm champagne gold
-    ambientColor: 0xfff7ed, // Warm candle ambient
-    ambientIntensity: 2.4,
-    primaryLightColor: 0xffedd5, // Warm ivory
-    accentLightColor: 0xf43f5e, // Warm blush rose accent
-    chairFrameColor: 0xd4af37, // Gilded Champagne Gold Tiffany frame
-    chairClothColor: 0x881337, // Royal Deep Rose / Burgundy Velvet cushion (rich contrast)
-    chairBowColor: 0xf472b6, // Blush pink satin bows
-    tableClothColor: 0xfffaf0, // Ivory silk
-    tableOverlayColor: 0xbe185d, // Rose gold runner
-    curtainColor: 0xfce7f3, // Soft sheer pink voiles
+    floorBase: '#eadcd2',
+    floorVein: 'rgba(160, 112, 104, 0.14)',
+    floorGrout: 'rgba(170, 128, 110, 0.32)',
+    wallColor: 0xeedcd4,
+    wainscotColor: 0xe0c8be,
+    ceilingColor: 0xe0cfc7,
+    drapeColor: 0xf3dfda,
+    carpetColor: 0xa65d66, // hồng đất
+    carpetBorderColor: 0xd2b07a,
+    ambientColor: 0xfff0ea,
+    ambientIntensity: 0.25,
+    primaryLightColor: 0xffeee2,
+    accentLightColor: 0xffd9c8,
+    chairFrameColor: 0xcfae78,
+    chairClothColor: 0xd9a9a8,
+    chairBowColor: 0xf0d3cf,
+    tableClothColor: 0xf6ece6,
+    tableOverlayColor: 0xc58e8f,
+    rugColor: '#dcbfb8',
+    rugRing: '#b58a6a',
+    curtainColor: 0xf3dfda,
     flowerPalette: {
-      primary: 0xf472b6, // Blush roses
-      secondary: 0xfbcfe8, // Peonies
-      accent: 0xfde047, // Golden centers
-      leaf: 0x16a34a,
+      primary: 0xf0bcc2, // hồng phấn
+      secondary: 0xfbeee6, // kem
+      accent: 0xe8c48a,
+      leaf: 0x7a9465,
     },
+    screenBg: '#32202a',
+    screenAccent: '#e3b7a8',
+    screenText: '#f8eae4',
     chandelierStyle: 'fairy',
-    description: 'Lãng mạn cổ điển · Hồng phấn, Kem & Vàng champagne',
+    description: 'Lãng mạn · Hồng phấn, Kem & Vàng champagne',
     badge: '🌸 Hoa Hồng',
   },
 };
