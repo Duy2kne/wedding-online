@@ -16,5 +16,8 @@ services:
         value: 50
       - key: MAX_HALLS
         value: 6
+      # Đặt mật khẩu trong Render > Environment (không ghi vào file để khỏi lộ trên GitHub)
       - key: ADMIN_PASSWORD
-        value: duytam2026
+        sync: false
+      - key: DATA_DIR
+        value: ./data
