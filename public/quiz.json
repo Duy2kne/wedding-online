@@ -20,7 +20,7 @@
   {
     "id": 4,
     "question": "Chuyến du lịch đầu tiên của cô dâu và chú rể là ở đâu?",
-    "options": ["Phú Quốc", "Sa Pa", "Đà Lạt", "Hội An"],
+    "options": ["Phú Quốc", "Nha Trang", "Đà Lạt", "Hội An"],
     "answer": 2
   },
   {
@@ -44,19 +44,19 @@
   {
     "id": 8,
     "question": "Cô dâu Thiều Tâm học đại học ở thành phố nào?",
-    "options": ["Hà Nội", "Huế", "Đà Nẵng", "TP. Hồ Chí Minh"],
+    "options": ["Hà Nội", "Thanh Hóa", "Đà Nẵng", "TP. Hồ Chí Minh"],
     "answer": 2
   },
   {
     "id": 9,
     "question": "Địa điểm nào cả hai mong muốn được đi du lịch nhất?",
-    "options": ["Nhật Bản", "Hàn Quốc", "Thái Lan", "Pháp"],
+    "options": ["Trung Quốc", "Hàn Quốc", "Thái Lan", "Thụy Sỹ"],
     "answer": 1
   },
   {
     "id": 10,
     "question": "Món đồ đầu tiên mà cả hai cùng nhau mua là gì?",
-    "options": ["Nồi cơm điện", "Đôi nhẫn đôi", "Cái quạt nước", "Chiếc xe máy"],
+    "options": ["Nồi cơm điện", "Đôi nhẫn đôi", "Cái quạt nước", "Đồng hồ thông minh"],
     "answer": 2
   }
 ]
