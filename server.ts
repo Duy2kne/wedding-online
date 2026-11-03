@@ -24,7 +24,14 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const MAX_PER_HALL = parseInt(process.env.MAX_PER_HALL || '50', 10);
 const MAX_HALLS = parseInt(process.env.MAX_HALLS || '6', 10);
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'duytam2026';
+// Không có ADMIN_PASSWORD thì tạo mật khẩu ngẫu nhiên (in ra log) thay vì dùng mật khẩu mặc định ai cũng biết
+const ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD ||
+  (() => {
+    const pw = Math.random().toString(36).slice(2, 10);
+    console.warn(`⚠️  Chưa đặt ADMIN_PASSWORD. Mật khẩu /admin tạm thời: ${pw}`);
+    return pw;
+  })();
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'wedding.json');
 
@@ -52,6 +59,8 @@ let weddingConfig: WeddingConfig = {
     youtubeUrl: 'https://youtu.be/uIlNkfn6NcA',
   },
   hashtag: '#DuyTamWedding',
+  groomParents: { father: 'Võ Đình Dũng', mother: 'Huỳnh Thị Kim Sự' },
+  brideParents: { father: 'Thiều Quang Tuệ', mother: 'Lường Thị Liên' },
 };
 
 if (fs.existsSync(CONFIG_PATH)) {
@@ -175,11 +184,13 @@ async function checkYouTubeVideo() {
 }
 checkYouTubeVideo();
 
+const VALID_ACTIONS = new Set(['idle', 'walk', 'run', 'sit', 'toast', 'cheer', 'dance', 'kiss', 'wave', 'clap']);
+
 // Express & Socket.IO App
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
+app.use(express.json({ limit: '9mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 // Content Security Policy for YouTube iframe
 app.use((req, res, next) => {
@@ -477,9 +488,9 @@ io.on('connection', (socket: Socket) => {
     currentHallId = assignedHall;
     socket.join(currentHallId);
 
-    // Initial spawn position near floral arch at entrance [0, 0, 18]
+    // Vị trí xuất hiện: ngay trước cổng hoa (cổng ở z = 18)
     const spawnX = (Math.random() - 0.5) * 4;
-    const spawnZ = 18 + Math.random() * 2;
+    const spawnZ = 21.5 + Math.random() * 2; // đứng trước cổng hoa nhìn vào sảnh
 
     const playerState: PlayerState = {
       id: socket.id,
@@ -552,7 +563,8 @@ io.on('connection', (socket: Socket) => {
 
     currentHallId = targetHallId;
     p.hallId = targetHallId;
-    p.position = [(Math.random() - 0.5) * 4, 0, 18];
+    p.position = [(Math.random() - 0.5) * 4, 0, 21.5 + Math.random() * 2]; // trước cổng hoa
+    p.action = 'idle';
     socket.join(targetHallId);
 
     const hallPlayers = Array.from(players.values()).filter((item) => item.hallId === currentHallId);
@@ -577,7 +589,7 @@ io.on('connection', (socket: Socket) => {
     if (!p) return;
 
     // If moving, stand up from seat
-    if (p.seatedAt && data.action === 'walk') {
+    if (p.seatedAt && (data.action === 'walk' || data.action === 'run')) {
       const seatKey = `${p.seatedAt.tableIndex}_${p.seatedAt.seatIndex}`;
       if (storedData.seats[p.hallId]) {
         delete storedData.seats[p.hallId][seatKey];
@@ -586,9 +598,14 @@ io.on('connection', (socket: Socket) => {
       p.seatedAt = null;
     }
 
-    p.position = data.position;
-    p.rotation = data.rotation;
-    p.action = (data.action as any) || 'idle';
+    if (!Array.isArray(data?.position) || data.position.length !== 3 || !data.position.every(Number.isFinite)) return;
+    p.position = [
+      Math.max(-60, Math.min(60, data.position[0])),
+      Math.max(-1, Math.min(5, data.position[1])),
+      Math.max(-60, Math.min(60, data.position[2])),
+    ];
+    p.rotation = Number.isFinite(data.rotation) ? data.rotation : p.rotation;
+    p.action = VALID_ACTIONS.has(data.action) ? (data.action as any) : 'idle';
   });
 
   // Action (toast, dance, clap, wave, kiss, cheer)
@@ -599,7 +616,7 @@ io.on('connection', (socket: Socket) => {
     lastActionTimes.set(socket.id, now);
 
     const p = players.get(socket.id);
-    if (!p) return;
+    if (!p || !VALID_ACTIONS.has(actionType)) return;
 
     p.action = actionType as any;
 
@@ -1041,49 +1058,78 @@ app.get('/api/wedding-config', (req, res) => {
   res.json(weddingConfig);
 });
 
-app.get('/api/media/photos', (req, res) => {
+// Ảnh cưới chính thức nằm ở public/media/photos (đi kèm bản build).
+// Ảnh khách ghép ở Photo Booth lưu trong DATA_DIR/guest-photos để không mất khi chạy bản production (dist/).
+const GUEST_PHOTO_DIR = path.join(DATA_DIR, 'guest-photos');
+if (!fs.existsSync(GUEST_PHOTO_DIR)) fs.mkdirSync(GUEST_PHOTO_DIR, { recursive: true });
+app.use('/media/guest', express.static(GUEST_PHOTO_DIR, { maxAge: '7d' }));
+
+function listWeddingPhotos(): string[] {
   const photosDir = path.join(__dirname, 'public', 'media', 'photos');
-  if (fs.existsSync(photosDir)) {
-    const files = fs
-      .readdirSync(photosDir)
-      .filter((f) => /\.(jpg|jpeg|png|webp|svg)$/i.test(f))
-      .map((f) => `/media/photos/${f}`);
-    res.json(files);
-  } else {
-    res.json([]);
-  }
+  if (!fs.existsSync(photosDir)) return [];
+  return fs
+    .readdirSync(photosDir)
+    .filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f))
+    .sort()
+    .map((f) => `/media/photos/${f}`);
+}
+
+function listGuestPhotos(): string[] {
+  if (!fs.existsSync(GUEST_PHOTO_DIR)) return [];
+  return fs
+    .readdirSync(GUEST_PHOTO_DIR)
+    .filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f))
+    .sort()
+    .reverse()
+    .slice(0, 30)
+    .map((f) => `/media/guest/${f}`);
+}
+
+app.get('/api/media/photos', (req, res) => {
+  res.json([...listWeddingPhotos(), ...listGuestPhotos()]);
 });
 
-// Photo Booth Upload: Save user's composite photo & broadcast to 3D Photo Wall
+// Photo Booth Upload: lưu ảnh ghép của khách & phát cho mọi người
+const lastUploadByIp = new Map<string, number>();
 app.post('/api/media/photos/upload', (req, res) => {
   const { dataUrl, title } = req.body;
-  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+  if (!dataUrl || typeof dataUrl !== 'string') {
     res.status(400).json({ error: 'Dữ liệu ảnh không hợp lệ!' });
+    return;
+  }
+  // Chỉ nhận ảnh raster (không nhận SVG để tránh chèn mã)
+  const matches = dataUrl.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!matches) {
+    res.status(400).json({ error: 'Chỉ nhận ảnh PNG, JPG hoặc WEBP!' });
+    return;
+  }
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '');
+  const now = Date.now();
+  if (now - (lastUploadByIp.get(ip) || 0) < 15000) {
+    res.status(429).json({ error: 'Bạn vừa gửi ảnh, đợi vài giây rồi gửi lại nhé!' });
     return;
   }
 
   try {
-    const photosDir = path.join(__dirname, 'public', 'media', 'photos');
-    if (!fs.existsSync(photosDir)) {
-      fs.mkdirSync(photosDir, { recursive: true });
-    }
-
-    const matches = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-    if (!matches) {
-      res.status(400).json({ error: 'Định dạng base64 không đúng!' });
+    const buffer = Buffer.from(matches[2], 'base64');
+    if (buffer.length > 6 * 1024 * 1024) {
+      res.status(413).json({ error: 'Ảnh quá lớn (tối đa 6MB)!' });
       return;
     }
+    lastUploadByIp.set(ip, now);
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const filename = `guest_${now}.${ext}`;
+    fs.writeFileSync(path.join(GUEST_PHOTO_DIR, filename), buffer);
 
-    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1].replace('svg+xml', 'svg');
-    const filename = `photo_guest_${Date.now()}.${ext}`;
-    const filePath = path.join(photosDir, filename);
-    const buffer = Buffer.from(matches[2], 'base64');
-    fs.writeFileSync(filePath, buffer);
+    // Giữ tối đa 60 ảnh khách để không đầy ổ đĩa
+    const all = fs.readdirSync(GUEST_PHOTO_DIR).filter((f) => f.startsWith('guest_')).sort();
+    all.slice(0, Math.max(0, all.length - 60)).forEach((f) => {
+      try { fs.unlinkSync(path.join(GUEST_PHOTO_DIR, f)); } catch {}
+    });
 
-    const publicUrl = `/media/photos/${filename}`;
+    const publicUrl = `/media/guest/${filename}`;
     const photoTitle = sanitizeText(title || 'Kỷ Niệm Cưới · Hoàng Duy ♥ Thiều Tâm', 40);
 
-    // Broadcast new photo to all guests in real time
     io.emit('photo:new', { url: publicUrl, title: photoTitle });
     console.log(`[PhotoBooth] New photo saved: ${publicUrl}`);
 
