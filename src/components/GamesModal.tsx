@@ -83,9 +83,11 @@ export const GamesModal: React.FC<GamesModalProps> = ({
 };
 
 // 1. Jigsaw Puzzle Game Component
+const JIGSAW_PHOTOS = Array.from({ length: 9 }, (_, i) => `/media/photos/anh${String(i + 1).padStart(2, '0')}.webp`);
+const randomJigsawPhoto = () => JIGSAW_PHOTOS[Math.floor(Math.random() * JIGSAW_PHOTOS.length)];
 const JigsawGame: React.FC<{ onComplete: (score: number, details: any) => void }> = ({ onComplete }) => {
   const [gridSize, setGridSize] = useState<number>(3); // 3x3 (Easy), 4x4 (Medium), 5x5 (Hard)
-  const [photoUrl, setPhotoUrl] = useState('/media/photos/photo1.svg');
+  const [photoUrl, setPhotoUrl] = useState(randomJigsawPhoto);
   const [pieces, setPieces] = useState<number[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<number | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -182,9 +184,9 @@ const JigsawGame: React.FC<{ onComplete: (score: number, details: any) => void }
             <Eye className="w-4 h-4" />
           </button>
           <button
-            onClick={() => initGame()}
+            onClick={() => setPhotoUrl(randomJigsawPhoto())}
             className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600"
-            title="Chơi lại"
+            title="Chơi lại với ảnh khác"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -193,7 +195,7 @@ const JigsawGame: React.FC<{ onComplete: (score: number, details: any) => void }
 
       {/* Jigsaw Board */}
       <div
-        className="relative w-full aspect-square max-w-[360px] bg-slate-100 rounded-2xl overflow-hidden shadow-md border-4 border-amber-200"
+        className="relative w-full aspect-[2/3] max-w-[280px] mx-auto bg-slate-100 rounded-2xl overflow-hidden shadow-md border-4 border-amber-200"
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
@@ -216,7 +218,7 @@ const JigsawGame: React.FC<{ onComplete: (score: number, details: any) => void }
               }`}
               style={{
                 backgroundImage: `url(${photoUrl})`,
-                backgroundSize: `${gridSize * 100}%`,
+                backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
                 backgroundPosition: `${bgX}% ${bgY}%`,
               }}
             >
