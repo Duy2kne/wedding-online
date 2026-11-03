@@ -75,6 +75,12 @@ export function App() {
   const mousePrev = useRef({ x: 0, y: 0 });
   const cameraAngle = useRef({ yaw: 0, pitch: 0.22, distance: 5.5 });
   const autoWalkTarget = useRef<THREE.Vector3 | null>(null);
+  // Ghế đang đi tới (chỉ giữ ghế khi đã tới nơi)
+  const pendingSeat = useRef<{ tableIndex: number; seatIndex: number; position: THREE.Vector3; lookAt: THREE.Vector3 } | null>(null);
+  const autoWalkStart = useRef(0);
+  const actionStartedAt = useRef(0);
+  // Giá trị UI cập nhật từ vòng lặp 3D: so sánh trước khi setState để không render lại 60 lần/giây
+  const uiCache = useRef<{ nearVideo: boolean; prompt: string | null }>({ nearVideo: false, prompt: null });
   const isMobile = useRef(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
 
   // Get or initialize persistent uid
@@ -302,6 +308,16 @@ export function App() {
       setUserData((prev) => (prev ? { ...prev, ...data } : null));
     });
 
+    // Đổi trang phục / tên / kiểu tóc: cập nhật ngay nhân vật (cả của mình lẫn người khác)
+    const applyLook = (data: { id: string } & Partial<PlayerState>) => {
+      const char = data.id === socket.id ? localCharRef.current : remoteCharsRef.current.get(data.id);
+      if (!char) return;
+      const { id: _id, ...look } = data;
+      char.updateState(look);
+    };
+    socket.on('player:outfit_updated', applyLook);
+    socket.on('player:profile_updated', applyLook);
+
     socket.on('profile:updated', (data: { user: UserData }) => {
       setUserData(data.user);
     });
@@ -365,7 +381,10 @@ export function App() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       keysDown.current[e.code] = true;
-      autoWalkTarget.current = null; // Movement cancels auto-walk
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        autoWalkTarget.current = null; // tự di chuyển thì huỷ đi tới ghế
+        pendingSeat.current = null;
+      }
 
       if (e.code === 'KeyE') {
         handleInteractWithNearest();
@@ -479,31 +498,59 @@ export function App() {
     if (!localCharRef.current || !socketRef.current) return;
 
     if (action === 'sit') {
-      // Auto-walk to closest chair
+      // Tự đi tới ghế trống gần nhất, tới nơi mới ngồi xuống
       if (hall3DRef.current) {
-        let closestSeat: any = null;
-        let minDist = 999;
         const pPos = localCharRef.current.group.position;
+        let closestSeat: (typeof hall3DRef.current.tableSeats)[number] | null = null;
+        let minDist = 999;
         hall3DRef.current.tableSeats.forEach((seat) => {
+          const busy = [...remoteCharsRef.current.values()].some(
+            (c) => c.state.action === 'sit' && c.group.position.distanceTo(seat.position) < 0.4
+          );
           const d = pPos.distanceTo(seat.position);
-          if (d < minDist) {
+          if (!busy && d < minDist) {
             minDist = d;
             closestSeat = seat;
           }
         });
         if (closestSeat) {
-          autoWalkTarget.current = closestSeat.position.clone();
-          socketRef.current.emit('seat:take', {
-            tableIndex: closestSeat.tableIndex,
-            seatIndex: closestSeat.seatIndex,
-          });
+          const seat = closestSeat as (typeof hall3DRef.current.tableSeats)[number];
+          pendingSeat.current = { ...seat };
+          if (minDist < 0.45) {
+            sitDown();
+          } else {
+            autoWalkTarget.current = seat.position.clone();
+            autoWalkStart.current = performance.now();
+          }
         }
       }
+      return;
     }
 
+    actionStartedAt.current = performance.now();
     localCharRef.current.updateState({ action });
     socketRef.current.emit('action', action);
   };
+
+  // Ngồi xuống ghế đã đi tới
+  const sitDown = () => {
+    const seat = pendingSeat.current;
+    const char = localCharRef.current;
+    if (!seat || !char || !socketRef.current) return;
+    pendingSeat.current = null;
+    autoWalkTarget.current = null;
+    const g = char.group;
+    g.position.set(seat.position.x, 0, seat.position.z);
+    g.rotation.y = Math.atan2(seat.lookAt.x - seat.position.x, seat.lookAt.z - seat.position.z);
+    char.updateState({ action: 'sit', position: [g.position.x, 0, g.position.z], rotation: g.rotation.y });
+    socketRef.current.emit('move', { position: [g.position.x, 0, g.position.z], rotation: g.rotation.y, action: 'sit' });
+    socketRef.current.emit('seat:take', { tableIndex: seat.tableIndex, seatIndex: seat.seatIndex });
+  };
+
+  // Chỉ dùng khi chạy dev để kiểm thử tự động (bị loại khỏi bản build)
+  if (import.meta.env.DEV) {
+    (window as any).__wed = { hall3DRef, localCharRef, remoteCharsRef, cameraAngle, handlePerformAction };
+  }
 
   // 8. Main Game Loop (RequestAnimationFrame)
   useEffect(() => {
@@ -543,12 +590,16 @@ export function App() {
         if (autoWalkTarget.current) {
           const toTarget = autoWalkTarget.current.clone().sub(pGroup.position);
           toTarget.y = 0;
-          if (toTarget.length() > 0.4) {
-            toTarget.normalize();
-            moveX = toTarget.x;
-            moveZ = toTarget.z;
+          const tooLong = performance.now() - autoWalkStart.current > 9000;
+          if (toTarget.length() > 0.3 && !tooLong) {
+            // Hướng đi tính theo thế giới -> đổi về hệ camera vì bên dưới cộng yaw
+            const worldAngle = Math.atan2(toTarget.x, toTarget.z) - cameraAngle.current.yaw;
+            moveX = Math.sin(worldAngle);
+            moveZ = Math.cos(worldAngle);
           } else {
             autoWalkTarget.current = null;
+            if (pendingSeat.current && !tooLong) sitDown();
+            else pendingSeat.current = null;
           }
         }
 
@@ -582,6 +633,17 @@ export function App() {
               action: isRunning ? 'run' : 'walk',
             });
           }
+        } else if (
+          ['toast', 'cheer', 'dance', 'kiss', 'wave', 'clap'].includes(localChar.state.action) &&
+          performance.now() - actionStartedAt.current > (localChar.state.action === 'dance' ? 12000 : 6000)
+        ) {
+          // Hành động tự kết thúc sau vài giây để nhân vật về tư thế đứng
+          localChar.updateState({ action: 'idle' });
+          socketRef.current?.emit('move', {
+            position: [pGroup.position.x, pGroup.position.y, pGroup.position.z],
+            rotation: pGroup.rotation.y,
+            action: 'idle',
+          });
         } else if (localChar.state.action === 'walk' || localChar.state.action === 'run') {
           localChar.updateState({ action: 'idle' });
           if (socketRef.current) {
@@ -616,7 +678,11 @@ export function App() {
 
         // Check proximity to video screen
         const distToStage = pGroup.position.distanceTo(hall3D.stageCenter);
-        setNearVideo(distToStage < 12.0);
+        const near = distToStage < 12.0;
+        if (near !== uiCache.current.nearVideo) {
+          uiCache.current.nearVideo = near;
+          setNearVideo(near);
+        }
 
         // Check proximity prompts
         let foundPrompt: string | null = null;
@@ -632,7 +698,10 @@ export function App() {
             }
           }
         }
-        setActivePrompt(foundPrompt);
+        if (foundPrompt !== uiCache.current.prompt) {
+          uiCache.current.prompt = foundPrompt;
+          setActivePrompt(foundPrompt);
+        }
 
         // Update Hall 3D (petals, NPCs, countdown texture, shadow, CSS3D)
         hall3D.update(delta, frameCount);
