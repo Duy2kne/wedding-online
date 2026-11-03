@@ -43,6 +43,7 @@ export function App() {
   const [soundBlocked, setSoundBlocked] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const videoFailed = useRef(false);
+  const lastSoundTap = useRef(-1e9);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [debugStats, setDebugStats] = useState<{ fps: number; drawCalls: number } | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -191,7 +192,14 @@ export function App() {
         );
         hall3DRef.current = hallScene;
 
-        hallScene.onSoundBlocked = () => setSoundBlocked(true);
+        hallScene.onSoundBlocked = () => {
+          setSoundBlocked(true);
+          // Khách vừa bấm "Bật nhạc" mà điện thoại vẫn chặn -> gợi ý cách nghe
+          if (performance.now() - lastSoundTap.current < 10000) {
+            showToast('🔇 Điện thoại đang chặn tiếng video. Mở "Xem video lớn" trong menu ☰ để nghe nhạc nhé!');
+          }
+        };
+        hallScene.onSoundOk = () => setSoundBlocked(false);
         hallScene.onVideoError = () => {
           // Video lỗi -> dùng nhạc nền dự phòng để sảnh không im lặng
           videoFailed.current = true;
@@ -316,7 +324,6 @@ export function App() {
 
     socket.on('bouquet:caught', (data: any) => {
       if (data.winnerName) {
-        soundManager.playApplause();
         confetti({ particleCount: 100, spread: 80 });
       }
     });
@@ -366,6 +373,7 @@ export function App() {
     preferredHall: string;
   }) => {
     if (!socketRef.current) return;
+    soundManager.unlock(); // bấm "Vào dự tiệc" = thao tác người dùng -> mở khoá âm thanh (iPhone)
     socketRef.current.emit('join', {
       uid: getUid(),
       name: data.name,
@@ -486,6 +494,8 @@ export function App() {
       for (const t of Array.from(e.changedTouches)) camTouches.delete(t.identifier);
       pinchDist = camTouches.size >= 2 ? pinchSpan() : 0;
     };
+    const unlockAudio = () => soundManager.unlock();
+    window.addEventListener('pointerdown', unlockAudio, true);
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onTouchEnd);
@@ -499,6 +509,7 @@ export function App() {
     window.addEventListener('wheel', onWheel, { passive: true });
 
     return () => {
+      window.removeEventListener('pointerdown', unlockAudio, true);
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onTouchEnd);
@@ -531,7 +542,6 @@ export function App() {
     for (const b of hall3DRef.current.boothLocations) {
       if (pPos.distanceTo(b.position) < b.radius) {
         if (b.id === 'photo_swing') {
-          soundManager.playApplause();
           showToast('📸 Bạn đã tạo dáng tuyệt đẹp trên xích đu hoa!');
         } else if (b.id === 'photobooth') {
           setShowPhotoBooth(true);
@@ -599,6 +609,7 @@ export function App() {
     }
 
     actionStartedAt.current = performance.now();
+    if (action === 'clap') soundManager.startClapping('local', 1);
     localCharRef.current.updateState({ action });
     socketRef.current.emit('action', action);
   };
@@ -741,6 +752,11 @@ export function App() {
         cam.position.lerp(desiredCamPos, 0.18);
         cam.lookAt(pGroup.position.x, pGroup.position.y + 1.2, pGroup.position.z);
 
+        // Tiếng vỗ tay chỉ phát khi chính mình bấm nút "Vỗ tay" -> dừng khi nhân vật thôi vỗ tay
+        if (localChar.state.action !== 'clap' && soundManager.isClapping('local')) {
+          soundManager.stopClapping('local');
+        }
+
         // Update Characters Animations
         localChar.update(delta);
         remoteCharsRef.current.forEach((rChar) => {
@@ -795,6 +811,7 @@ export function App() {
   // Bật / tắt nhạc (tiếng của video cưới). Gọi trong sự kiện bấm để iPhone cho phép phát tiếng.
   const handleToggleVideoAudio = () => {
     if (!hall3DRef.current) return;
+    lastSoundTap.current = performance.now();
     const next = soundBlocked ? true : !videoAudioOn;
     if (videoFailed.current) {
       // video lỗi: nút điều khiển nhạc nền dự phòng
