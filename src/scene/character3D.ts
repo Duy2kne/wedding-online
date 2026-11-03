@@ -208,7 +208,32 @@ function hairParts(gender: Gender, style: number, hex: number): THREE.BufferGeom
   };
 
   if (gender === 'male') {
-    if (style === 1) {
+    if (style === 3) {
+      // Side part Hàn Quốc: 2 bên gọn sát, phần trên phồng tròn, đường ngôi bên trái lộ trán,
+      // mái vuốt chéo: cao ở bên ngôi, rủ dần xuống chân mày bên phải, đuôi thon.
+      parts.push(cap(0.6, 1.8, HEAD_R + 0.02));
+      // khối phồng phía trên (lệch phải) - đáy hạ thấp để nối mượt với lớp tóc nền
+      parts.push(ellipsoid(0.29, 0.15, 0.3, 0.04, HEAD_Y + 0.195, -0.015, hex, 32));
+      // lọn mái chéo
+      const fr = new THREE.SphereGeometry(1, 40, 20);
+      fr.scale(0.25, 0.075, 0.1);
+      const pos = fr.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const t = (x + 0.25) / 0.5; // 0 = đường ngôi (trái), 1 = thái dương phải
+        const thick = 1.25 - 0.85 * t; // dày ở gốc, thon ở đuôi
+        pos.setY(i, pos.getY(i) * thick + 0.06 - 0.27 * t * t);
+        pos.setZ(i, pos.getZ(i) * (1.1 - 0.5 * t) - 0.1 * t * t);
+      }
+      fr.computeVertexNormals();
+      fr.rotateX(0.32);
+      fr.translate(0.04, HEAD_Y + 0.17, 0.255);
+      parts.push(paint(fr, hex));
+      // gáy và mai tóc gọn
+      parts.push(ellipsoid(0.27, 0.13, 0.16, 0, HEAD_Y - 0.1, -0.2, hex, 18));
+      parts.push(ellipsoid(0.03, 0.075, 0.055, -0.318, HEAD_Y - 0.03, 0.06, hex, 10));
+      parts.push(ellipsoid(0.03, 0.075, 0.055, 0.318, HEAD_Y - 0.03, 0.06, hex, 10));
+    } else if (style === 1) {
       // Tóc dựng
       parts.push(cap(0.55, 1.75));
       for (let i = 0; i < 7; i++) {
@@ -421,13 +446,27 @@ function upperArmGeom(sleeve: number, puff: boolean) {
     return merge(parts);
   });
 }
-function lowerArmGeom(sleeve: number, cuff?: number) {
-  return cached(`la_${sleeve}_${cuff}`, () => {
+function lowerArmGeom(sleeve: number, cuff?: number, watch = false) {
+  return cached(`la_${sleeve}_${cuff}_${watch}`, () => {
     const parts = [capsule(0.052, FOREARM, -FOREARM / 2, sleeve)];
     if (cuff !== undefined) {
       const g = new THREE.CylinderGeometry(0.056, 0.056, 0.03, 10);
       g.translate(0, -FOREARM + 0.01, 0);
       parts.push(paint(g, cuff));
+    }
+    if (watch) {
+      // Đồng hồ: dây kim loại bạc + mặt số tối viền vàng, mặt quay ra ngoài cổ tay
+      const band = new THREE.CylinderGeometry(0.06, 0.06, 0.028, 14);
+      band.translate(0, -FOREARM + 0.045, 0);
+      parts.push(paint(band, 0xcfd4da));
+      const rim = new THREE.CylinderGeometry(0.034, 0.034, 0.014, 16);
+      rim.rotateZ(Math.PI / 2);
+      rim.translate(-0.062, -FOREARM + 0.045, 0);
+      parts.push(paint(rim, 0xd8b56a));
+      const face = new THREE.CylinderGeometry(0.027, 0.027, 0.006, 16);
+      face.rotateZ(Math.PI / 2);
+      face.translate(-0.07, -FOREARM + 0.045, 0);
+      parts.push(paint(face, 0x1c2430));
     }
     parts.push(ellipsoid(0.058, 0.064, 0.05, 0, -FOREARM - 0.055, 0.005, SKIN, 10));
     return merge(parts);
@@ -481,11 +520,13 @@ function buildBody(state: PlayerState, o: OutfitSpec) {
     parts.push(ellipsoid(0.018, 0.018, 0.018, 0, 0.95, 0.142, bow, 6));
     // ve áo
     for (const sx of [-1, 1]) {
-      const lapel = new THREE.BoxGeometry(0.035, 0.2, 0.012);
-      lapel.rotateZ(sx * 0.32);
-      lapel.rotateX(-0.12);
-      lapel.translate(sx * 0.06, 0.875, 0.158);
-      parts.push(paint(lapel, o.top === 0xf1ebe1 ? 0xe4dccf : 0x0f0f13));
+      // ve áo nằm sát ngực (nghiêng theo thân áo), cùng tông với áo
+      const lapel = new THREE.BoxGeometry(0.04, 0.17, 0.008);
+      lapel.rotateZ(sx * 0.3);
+      lapel.rotateX(-0.3);
+      lapel.translate(sx * 0.058, 0.885, 0.142);
+      const c = new THREE.Color(o.top).multiplyScalar(0.92);
+      parts.push(paint(lapel, c.getHex()));
     }
     // khuy áo + hoa cài ngực
     parts.push(ellipsoid(0.014, 0.014, 0.01, 0, 0.74, 0.137, 0x0c0c0f, 6));
@@ -529,11 +570,13 @@ function buildBody(state: PlayerState, o: OutfitSpec) {
     trim.scale(1.04, 1, 0.82);
     trim.translate(0, 0.885, 0);
     parts.push(paint(trim, o.trim || o.top));
-    // vòng cổ ngọc trai
-    const pearl = new THREE.TorusGeometry(0.07, 0.01, 6, 16);
-    pearl.rotateX(Math.PI / 2 - 0.35);
-    pearl.translate(0, 0.98, 0.02);
-    parts.push(paint(pearl, 0xfaf6ee));
+    // vòng cổ ngọc trai (nếu không đeo vàng cưới)
+    if (!(state.accessories || []).includes('gold_necklace')) {
+      const pearl = new THREE.TorusGeometry(0.07, 0.01, 6, 16);
+      pearl.rotateX(Math.PI / 2 - 0.35);
+      pearl.translate(0, 0.98, 0.02);
+      parts.push(paint(pearl, 0xfaf6ee));
+    }
     // chân váy
     const r = o.skirtR || 0.5;
     const s1 = skirtGeom(0.66, 0.02, 0.17, r, o.bottom, 0.05, 10);
@@ -576,6 +619,64 @@ function buildBody(state: PlayerState, o: OutfitSpec) {
       const col = i % 3 === 0 ? 0xf6c7d0 : i % 3 === 1 ? 0xfdf8f0 : 0xf2d38a;
       parts.push(ellipsoid(0.05, 0.04, 0.05, Math.sin(a) * 0.29, HEAD_Y + 0.22 + Math.cos(a) * 0.04, Math.cos(a) * 0.25 - 0.03, col, 8));
     }
+  }
+  if (acc.includes('tiara')) {
+    // Vương miện: vòng vàng trên tóc, các nhánh nhọn cao dần ở giữa, đầu nhánh gắn pha lê
+    const tiara: THREE.BufferGeometry[] = [];
+    const R = 0.3;
+    const h = 0.2;
+    const ring: THREE.Vector3[] = [];
+    for (let i = 0; i <= 16; i++) {
+      const a = -1.2 + (i / 16) * 2.4;
+      ring.push(new THREE.Vector3(Math.sin(a) * R, h, Math.cos(a) * R));
+    }
+    tiara.push(paint(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring), 32, 0.016, 6, false), 0xe0b24f));
+    for (let i = 0; i <= 8; i++) {
+      const a = -1.0 + (i / 8) * 2.0;
+      const center = 1 - Math.abs(a) / 1.0;
+      const sh = 0.05 + center * 0.09;
+      const cone = new THREE.ConeGeometry(0.016, sh, 6);
+      cone.translate(0, h + sh / 2, 0);
+      cone.applyMatrix4(new THREE.Matrix4().makeTranslation(Math.sin(a) * R, 0, Math.cos(a) * R));
+      tiara.push(paint(cone, 0xe0b24f));
+      const gem = new THREE.OctahedronGeometry(i === 4 ? 0.04 : 0.022, 0);
+      gem.translate(Math.sin(a) * R, h + sh + 0.01, Math.cos(a) * R);
+      tiara.push(paint(gem, i === 4 ? 0xf3a6b8 : 0xfdfbff));
+      if (i % 2 === 1) {
+        const pearlBead = new THREE.SphereGeometry(0.017, 8, 6);
+        pearlBead.translate(Math.sin(a) * (R + 0.01), h + 0.02, Math.cos(a) * (R + 0.01));
+        tiara.push(paint(pearlBead, 0xfbf6ee));
+      }
+    }
+    // nghiêng ra sau theo mái tóc rồi đặt lên đầu
+    for (const g of tiara) {
+      g.rotateX(-0.32);
+      g.translate(0, HEAD_Y, -0.01);
+      parts.push(g);
+    }
+  }
+  if (acc.includes('gold_necklace')) {
+    // Kiềng cưới vàng ôm chân cổ
+    const kieng = new THREE.TorusGeometry(0.1, 0.016, 8, 28);
+    kieng.rotateX(Math.PI / 2 - 0.3);
+    kieng.translate(0, 0.965, 0.01);
+    parts.push(paint(kieng, 0xe0b24f));
+    // Dây chuyền vàng chữ V + mặt dây chuyền trái tim
+    const chain = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.11, 0.955, 0.04),
+      new THREE.Vector3(-0.07, 0.925, 0.12),
+      new THREE.Vector3(0, 0.905, 0.155),
+      new THREE.Vector3(0.07, 0.925, 0.12),
+      new THREE.Vector3(0.11, 0.955, 0.04),
+    ]);
+    parts.push(paint(new THREE.TubeGeometry(chain, 20, 0.006, 5, false), 0xe0b24f));
+    const heart = new THREE.Shape();
+    heart.moveTo(0, -0.03);
+    heart.bezierCurveTo(-0.035, -0.005, -0.03, 0.025, 0, 0.012);
+    heart.bezierCurveTo(0.03, 0.025, 0.035, -0.005, 0, -0.03);
+    const hg = new THREE.ExtrudeGeometry(heart, { depth: 0.008, bevelEnabled: false });
+    hg.translate(0, 0.875, 0.158);
+    parts.push(paint(hg, 0xe0b24f));
   }
   if (acc.includes('sunglasses')) {
     for (const sx of [-1, 1]) parts.push(ellipsoid(0.065, 0.045, 0.02, sx * 0.105, HEAD_Y - 0.005, HEAD_R - 0.025, 0x18181d, 10));
@@ -792,13 +893,14 @@ export class Character3D {
     const cuff = o.kind === 'suit' ? WHITE_SHIRT : o.kind === 'aodai_f' || o.kind === 'aodai_m' ? o.trim : undefined;
     const ua = upperArmGeom(sleeve, false);
     const la = lowerArmGeom(sleeve, cuff);
+    const laWatch = (this.state.accessories || []).includes('watch') ? lowerArmGeom(sleeve, cuff, true) : la;
     const mkArm = (side: -1 | 1) => {
       const shoulder = new THREE.Group();
       shoulder.position.set(side * SHOULDER_X, SHOULDER_Y, 0);
       shoulder.add(new THREE.Mesh(ua, bodyMaterial));
       const elbow = new THREE.Group();
       elbow.position.y = -UPPER_ARM;
-      elbow.add(new THREE.Mesh(la, bodyMaterial));
+      elbow.add(new THREE.Mesh(side < 0 ? laWatch : la, bodyMaterial)); // đồng hồ đeo tay trái
       shoulder.add(elbow);
       this.root.add(shoulder);
       return { shoulder, elbow };
