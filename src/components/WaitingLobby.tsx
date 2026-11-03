@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Sparkles, Users, Crown, Heart, ChevronRight, Music, Volume2, Shield } from 'lucide-react';
 import type { WeddingConfig, HallInfo, GuestGroup, Gender } from '../shared/types.js';
 import { OUTFIT_ITEMS } from '../shared/shop.js';
+import { Character3D } from '../scene/character3D.js';
 
 interface WaitingLobbyProps {
   config: WeddingConfig;
@@ -91,77 +92,53 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
     const camera = new THREE.PerspectiveCamera(40, 220 / 260, 0.1, 20);
     camera.position.set(0, 1.1, 3.2);
 
-    const ambLight = new THREE.AmbientLight(0xffffff, 1.4);
-    const dirLight = new THREE.DirectionalLight(0xfff1e6, 1.6);
-    dirLight.position.set(2, 4, 3);
-    scene.add(ambLight, dirLight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    camera.position.set(0, 1.05, 4.2);
+    camera.lookAt(0, 0.82, 0);
+    scene.add(new THREE.HemisphereLight(0xfff4e6, 0x8a6a50, 1.2));
+    const dirLight = new THREE.DirectionalLight(0xfff1e6, 1.8);
+    dirLight.position.set(2, 4, 4);
+    scene.add(dirLight);
 
-    // Build preview chibi preview mesh
-    const charGroup = new THREE.Group();
-    charGroup.position.y = -0.15;
-
-    // Head
-    const headGeom = new THREE.SphereGeometry(0.38, 16, 16);
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffebd8, roughness: 0.5 });
-    const head = new THREE.Mesh(headGeom, skinMat);
-    head.position.y = 1.15;
-    charGroup.add(head);
-
-    // Eyes
-    const eyeGeom = new THREE.SphereGeometry(0.045, 8, 8);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1f2937 });
-    const leftEye = new THREE.Mesh(eyeGeom, eyeMat);
-    leftEye.position.set(-0.12, 1.15, 0.35);
-    const rightEye = new THREE.Mesh(eyeGeom, eyeMat);
-    rightEye.position.set(0.12, 1.15, 0.35);
-    charGroup.add(leftEye, rightEye);
-
-    // Torso
-    let outfitColor = 0x2d3748;
-    if (selectedOutfit === 'suit_navy') outfitColor = 0x1e3a8a;
-    if (selectedOutfit === 'ao_dai_male') outfitColor = 0x0284c7;
-    if (selectedOutfit === 'dress_pink') outfitColor = 0xf472b6;
-    if (selectedOutfit === 'ao_dai_red') outfitColor = 0xdc2626;
-    if (selectedOutfit === 'dress_cream') outfitColor = 0xfef3c7;
-
-    const bodyGeom = new THREE.CylinderGeometry(0.24, 0.28, 0.5, 12);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: outfitColor, roughness: 0.5 });
-    const body = new THREE.Mesh(bodyGeom, bodyMat);
-    body.position.y = 0.65;
-    charGroup.add(body);
-
-    if (gender === 'female') {
-      const skirtGeom = new THREE.ConeGeometry(0.48, 0.55, 16);
-      const skirt = new THREE.Mesh(skirtGeom, bodyMat);
-      skirt.position.y = 0.42;
-      charGroup.add(skirt);
-    }
-
-    // Hair
-    const hairMat = new THREE.MeshStandardMaterial({
-      color: parseInt(hairColor.replace('#', '0x'), 16),
-      roughness: 0.6,
-    });
-    const hairGeom = new THREE.SphereGeometry(0.4, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.5);
-    const hair = new THREE.Mesh(hairGeom, hairMat);
-    hair.position.y = 1.22;
-    charGroup.add(hair);
-
+    // Dùng đúng nhân vật trong sảnh để xem trước
+    const preview = new Character3D(
+      {
+        id: 'preview',
+        uid: 'preview',
+        name: name.trim() || 'Bạn',
+        group,
+        gender,
+        hairStyle,
+        hairColor,
+        outfit: selectedOutfit,
+        accessories: [],
+        position: [0, 0, 0],
+        rotation: 0.35,
+        action: 'idle',
+        hallId: 'preview',
+      },
+      true,
+      { showNameplate: false, castShadow: false }
+    );
+    const charGroup = preview.group;
     scene.add(charGroup);
 
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      charGroup.rotation.y += 0.015; // Slow rotation preview
+      charGroup.rotation.y += 0.012; // xoay chậm để xem trang phục
+      preview.update(1 / 60);
       renderer.render(scene, camera);
     };
     animate();
 
     return () => {
       cancelAnimationFrame(animId);
+      preview.dispose();
       renderer.dispose();
     };
-  }, [gender, selectedOutfit, hairStyle, hairColor]);
+  }, [gender, selectedOutfit, hairStyle, hairColor, group]);
 
   // Quick join: picks fullest hall with available spot
   const handleQuickJoin = () => {
@@ -205,7 +182,15 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 overflow-y-auto bg-gradient-to-br from-rose-950/70 via-slate-950/80 to-purple-950/80 backdrop-blur-md">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 overflow-y-auto bg-slate-900"
+      style={{
+        backgroundImage:
+          'linear-gradient(180deg, rgba(42,26,30,0.55), rgba(42,26,30,0.75)), url(/media/photos/anh01.webp)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 35%',
+      }}
+    >
       {/* Wedding Invitation Card */}
       <div className="relative w-full max-w-4xl my-auto overflow-hidden bg-white/95 rounded-3xl shadow-2xl border-4 border-amber-300/80 text-slate-800">
         {/* Decorative corner ribbons */}
@@ -336,7 +321,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
                   Màu tóc:
                 </label>
                 <div className="flex gap-2 items-center">
-                  {['#1f2937', '#3d2314', '#7c2d12', '#b45309'].map((c) => (
+                  {['#1c1512', '#3d2314', '#6b3a22', '#9a6a3c'].map((c) => (
                     <button
                       key={c}
                       type="button"
@@ -430,7 +415,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
                         />
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 flex justify-between">
-                        <span>{h.theme === 'diamond' ? 'Pha lê trắng' : 'Hồng phấn'}</span>
+                        <span>{h.theme === 'diamond' ? 'Ngà & champagne' : 'Hồng phấn'}</span>
                         <span className="font-semibold text-slate-700">
                           {h.playerCount}/{h.maxPlayers} khách
                         </span>
