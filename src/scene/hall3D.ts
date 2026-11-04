@@ -1022,8 +1022,20 @@ export class WeddingHall3D {
       ctx.fillText(String(i + 1), x0 + 32, y + 1);
       ctx.textAlign = 'left';
       ctx.fillStyle = t.screenText;
-      ctx.font = `600 24px ${SANS_FONT}`;
-      const name = e.name.length > 12 ? e.name.slice(0, 11) + '…' : e.name;
+      // tên dài: thu nhỏ chữ trước, quá dài mới cắt "…"
+      const scoreW = (ctx.font = `700 24px ${SANS_FONT}`, ctx.measureText(String(e.score)).width);
+      const maxNameW = 312 - 62 - scoreW - 26;
+      let fs = 24;
+      ctx.font = `600 ${fs}px ${SANS_FONT}`;
+      while (fs > 15 && ctx.measureText(e.name).width > maxNameW) {
+        fs -= 1;
+        ctx.font = `600 ${fs}px ${SANS_FONT}`;
+      }
+      let name = e.name;
+      if (ctx.measureText(name).width > maxNameW) {
+        while (name.length > 1 && ctx.measureText(name + '…').width > maxNameW) name = name.slice(0, -1);
+        name += '…';
+      }
       ctx.fillText(name, x0 + 62, y + 1);
       ctx.textAlign = 'right';
       ctx.fillStyle = t.screenAccent;
