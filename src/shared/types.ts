@@ -62,9 +62,22 @@ export interface FlowerGift {
   id: string;
   uid: string;
   author: string;
-  flowerType: 'rose' | 'hydrangea' | 'basket' | 'car';
+  flowerType:
+    | 'rose'
+    | 'hydrangea'
+    | 'car'
+    | 'diapers'
+    | 'washing_machine'
+    | 'envelope'
+    | 'noodles'
+    | 'detergent'
+    | 'piggy'
+    | 'gift_box'
+    | 'teddy'
+    | 'rice_cooker';
   flowerName: string;
   position: [number, number, number];
+  slot?: number; // vị trí đặt quà dưới chân sân khấu
   hallId: string;
   createdAt: number;
   expiresAt: number;
