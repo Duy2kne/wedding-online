@@ -75,7 +75,7 @@ if (fs.existsSync(CONFIG_PATH)) {
 // Profanity filter dictionary (Vietnamese common vulgar words)
 const BAD_WORDS = [
   'đm', 'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'chó đẻ', 'khốn nạn', 'mẹ kiếp',
-  'fuck', 'shit', 'bitch', 'asshole', 'dkm', 'vcl', 'clgt', 'đmm','cc','clmm',
+  'fuck', 'shit', 'bitch', 'asshole', 'dkm', 'vcl', 'clgt', 'đmm','cc','clmm'
 ];
 
 function sanitizeText(input: string, maxLen = 200): string {
