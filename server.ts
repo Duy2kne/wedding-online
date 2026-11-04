@@ -17,6 +17,7 @@ import type {
   WeddingConfig,
 } from './src/shared/types.js';
 import { ALL_SHOP_ITEMS, getUserTitle } from './src/shared/shop.js';
+import { maskProfanity } from './src/shared/profanity.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,20 +73,11 @@ if (fs.existsSync(CONFIG_PATH)) {
   }
 }
 
-// Profanity filter dictionary (Vietnamese common vulgar words)
-const BAD_WORDS = [
-  'đm', 'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'chó đẻ', 'khốn nạn', 'mẹ kiếp',
-  'fuck', 'shit', 'bitch', 'asshole', 'dkm', 'vcl', 'clgt', 'đmm','cc','clmm'
-];
-
+// Lọc từ tục: danh sách từ cấm nằm ở src/shared/profanity.ts
 function sanitizeText(input: string, maxLen = 200): string {
-  if (!input) return '';
-  let clean = input.replace(/[\x00-\x1F\x7F<>]/g, '').trim().slice(0, maxLen);
-  for (const bw of BAD_WORDS) {
-    const reg = new RegExp(`\\b${bw}\\b`, 'gi');
-    clean = clean.replace(reg, '***');
-  }
-  return clean;
+  if (!input || typeof input !== 'string') return '';
+  const clean = input.normalize('NFC').replace(/[\x00-\x1F\x7F<>]/g, '').trim().slice(0, maxLen);
+  return maskProfanity(clean);
 }
 
 // Persistent Storage Model
@@ -1402,8 +1394,29 @@ async function setupViteOrStatic() {
 setupViteOrStatic().then(() => {
   httpServer.listen(PORT, HOST, () => {
     console.log(`💒 Tiệc Cưới Online Duy ♥ Tâm server running at http://${HOST}:${PORT}`);
+    startKeepAlive();
   });
 });
+
+// ---------- Giữ server luôn thức (Render bản miễn phí ngủ sau 15 phút không có ai truy cập) ----------
+// Cứ 10 phút server tự gọi vào địa chỉ public của chính nó (đi qua Render nên được tính là có người truy cập).
+// Render tự cung cấp RENDER_EXTERNAL_URL; có thể đặt KEEP_ALIVE_URL để chỉ định địa chỉ khác.
+// Tắt bằng biến môi trường KEEP_ALIVE=off (vd: khi đã lên gói trả phí).
+function startKeepAlive() {
+  const base = (process.env.KEEP_ALIVE_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+  if (!base || process.env.KEEP_ALIVE === 'off') return;
+  const url = `${base}/health`;
+  const ping = async () => {
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'wedding-keep-alive' }, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) console.warn(`[KeepAlive] ${url} -> ${res.status}`);
+    } catch (e: any) {
+      console.warn(`[KeepAlive] Không gọi được ${url}: ${e?.message || e}`);
+    }
+  };
+  setInterval(ping, 10 * 60 * 1000);
+  console.log(`[KeepAlive] Tự gọi ${url} mỗi 10 phút để server không ngủ`);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
