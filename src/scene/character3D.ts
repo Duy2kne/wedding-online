@@ -699,8 +699,43 @@ function createNameplateSprite(name: string, group: GuestGroup, label?: string):
   const color = group === 'groom' ? '#3c6fb4' : group === 'bride' ? '#c24d6b' : '#3f8f74';
   const tag = label || (group === 'groom' ? 'Nhà trai' : group === 'bride' ? 'Nhà gái' : 'Bạn bè');
 
-  ctx.font = '600 40px "Be Vietnam Pro", "Segoe UI", sans-serif';
-  const w = Math.min(480, Math.max(220, ctx.measureText(name).width + 90));
+  // Tên dài: thu nhỏ chữ cho vừa bảng (tối đa 2 dòng), không cắt bớt
+  const FONT = '"Be Vietnam Pro", "Segoe UI", sans-serif';
+  const MAXW = 400;
+  let size = 40;
+  ctx.font = `600 ${size}px ${FONT}`;
+  while (size > 26 && ctx.measureText(name).width > MAXW) {
+    size -= 2;
+    ctx.font = `600 ${size}px ${FONT}`;
+  }
+  let lines = [name];
+  if (ctx.measureText(name).width > MAXW) {
+    // vẫn quá dài -> ngắt 2 dòng theo khoảng trắng gần giữa nhất
+    size = 26;
+    ctx.font = `600 ${size}px ${FONT}`;
+    const words = name.split(' ');
+    let best = [name];
+    let bestW = Infinity;
+    for (let i = 1; i < words.length; i++) {
+      const a = words.slice(0, i).join(' ');
+      const b = words.slice(i).join(' ');
+      const mw = Math.max(ctx.measureText(a).width, ctx.measureText(b).width);
+      if (mw < bestW) {
+        bestW = mw;
+        best = [a, b];
+      }
+    }
+    lines = best;
+    const fitLine = (l: string) => {
+      if (ctx.measureText(l).width <= MAXW) return l;
+      let s = l;
+      while (s.length > 1 && ctx.measureText(s + '…').width > MAXW) s = s.slice(0, -1);
+      return s + '…';
+    };
+    lines = lines.map(fitLine);
+  }
+  const textW = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const w = Math.min(490, Math.max(220, textW + 90));
   const x0 = 256 - w / 2;
   ctx.fillStyle = 'rgba(255, 251, 246, 0.92)';
   ctx.strokeStyle = 'rgba(120, 90, 70, 0.25)';
@@ -716,7 +751,12 @@ function createNameplateSprite(name: string, group: GuestGroup, label?: string):
   ctx.fillStyle = '#3b2a26';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(name.slice(0, 18), 256 + 14, 51);
+  if (lines.length === 1) {
+    ctx.fillText(lines[0], 256 + 14, 51);
+  } else {
+    ctx.fillText(lines[0], 256 + 14, 35);
+    ctx.fillText(lines[1], 256 + 14, 65);
+  }
   ctx.font = '600 22px "Be Vietnam Pro", "Segoe UI", sans-serif';
   ctx.fillStyle = color;
   ctx.fillText(tag, 256, 106);
