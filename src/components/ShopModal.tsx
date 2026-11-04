@@ -35,7 +35,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
               <span>Tiệm Hỷ Cưới &amp; Tủ Đồ</span>
             </h2>
             <p className="text-xs text-slate-500">
-              Dùng điểm Hỷ tặng hoa chúc phúc cho Duy &amp; Tâm hoặc diện đồ mới
+              Dùng điểm Hỷ tặng quà chúc phúc cho Duy &amp; Tâm hoặc diện đồ mới
             </p>
           </div>
 
@@ -67,7 +67,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
             }`}
           >
             <Gift className="w-4 h-4" />
-            <span>Tặng Hoa Sân Khấu</span>
+            <span>Tặng Quà Cô Dâu Chú Rể</span>
           </button>
           <button
             onClick={() => setTab('wardrobe')}
@@ -87,7 +87,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
           {tab === 'flowers' ? (
             <div>
               <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
-                💐 Khi bạn tặng hoa, hoa sẽ xuất hiện trang trọng trên sân khấu kèm tên bạn trong 30 phút, đồng thời thông báo toàn tiệc để mọi người cùng chung vui!
+                🎁 Quà bạn tặng sẽ xuất hiện ngay dưới chân sân khấu (2 bên thảm đỏ) kèm tên bạn trong 30 phút, đồng thời thông báo toàn tiệc để mọi người cùng chung vui!
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
