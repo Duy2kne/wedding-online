@@ -65,6 +65,11 @@ function colorGeom(g: THREE.BufferGeometry, hex: number) {
   return g;
 }
 
+function shade(hex: number, k: number) {
+  const c = new THREE.Color(hex).multiplyScalar(k);
+  return new THREE.Color(Math.min(1, c.r), Math.min(1, c.g), Math.min(1, c.b)).getHex();
+}
+
 function mergeColored(parts: THREE.BufferGeometry[]) {
   const ready = parts.map((g) => {
     const x = g.index ? g.toNonIndexed() : g;
@@ -1785,8 +1790,8 @@ export class WeddingHall3D {
     const easels = [
       { x: -3.6, z: 15.2, ry: 0.5 },
       { x: 3.6, z: 15.2, ry: -0.5 },
-      { x: -3.6, z: -11.6, ry: 0.4 },
-      { x: 3.6, z: -11.6, ry: -0.4 },
+      { x: -11.2, z: -11.0, ry: 0.75 },
+      { x: 11.2, z: -11.0, ry: -0.75 },
     ];
     WEDDING_PHOTOS.slice(5, 9).forEach((p, i) => {
       const e = easels[i];
@@ -2157,64 +2162,492 @@ export class WeddingHall3D {
     }
   }
 
-  // ---------------- HOA KHÁCH TẶNG ----------------
+  // ---------------- QUÀ KHÁCH TẶNG (dưới chân sân khấu, 2 bên thảm đỏ) ----------------
   private giftGeomCache = new Map<string, THREE.BufferGeometry>();
-  private giftMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
+  private giftMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 });
+  private giftLabelCache = new Map<string, THREE.Mesh>();
+  // chiều cao (đặt bảng tên người tặng) & bán kính va chạm của từng món
+  private static GIFT_SCALE = 1.3; // phóng to toàn bộ quà
+  private static GIFT_INFO: Record<string, { h: number; r: number; s?: number }> = {
+    rose: { h: 1.08, r: 0.32 },
+    envelope: { h: 1.18, r: 0.4 },
+    hydrangea: { h: 0.92, r: 0.42 },
+    noodles: { h: 0.82, r: 0.42 },
+    detergent: { h: 0.74, r: 0.36 },
+    piggy: { h: 0.66, r: 0.4 },
+    gift_box: { h: 0.86, r: 0.42 },
+    teddy: { h: 1.12, r: 0.45 },
+    rice_cooker: { h: 0.66, r: 0.38 },
+    diapers: { h: 0.66, r: 0.36 },
+    washing_machine: { h: 0.88, r: 0.44 },
+    car: { h: 0.98, r: 0.62, s: 1.12 }, // xe hoa to hơn nữa
+  };
 
-  private giftGeometry(type: FlowerGift['flowerType']) {
+  private giftGeometry(type: string) {
     const hit = this.giftGeomCache.get(type);
     if (hit) return hit;
     const parts: THREE.BufferGeometry[] = [];
-    const bloom = (x: number, y: number, z: number, r: number, hex: number) => parts.push(colorGeom(new THREE.IcosahedronGeometry(r, 1).translate(x, y, z), hex));
-    const leaf = (x: number, y: number, z: number, hex = 0x6f8a5c) => parts.push(colorGeom(new THREE.SphereGeometry(1, 6, 4).scale(0.05, 0.015, 0.1).translate(x, y, z), hex));
+    const P = (g: THREE.BufferGeometry, hex: number) => parts.push(colorGeom(g, hex));
+    const sph = (rx: number, ry: number, rz: number, x: number, y: number, z: number, hex: number, seg = 16) =>
+      P(new THREE.SphereGeometry(1, seg, Math.max(6, Math.round(seg * 0.6))).scale(rx, ry, rz).translate(x, y, z), hex);
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number, hex: number) =>
+      P(new THREE.BoxGeometry(w, h, d).translate(x, y, z), hex);
+    const cyl = (rt: number, rb: number, h: number, x: number, y: number, z: number, hex: number, seg = 20) =>
+      P(new THREE.CylinderGeometry(rt, rb, h, seg).translate(x, y, z), hex);
+    const up = new THREE.Vector3(0, 1, 0);
+    const rod = (a: THREE.Vector3, b: THREE.Vector3, r: number, hex: number) => {
+      const dir = b.clone().sub(a);
+      const g = new THREE.CylinderGeometry(r, r, dir.length(), 8).translate(0, dir.length() / 2, 0);
+      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, dir.normalize()));
+      P(g.translate(a.x, a.y, a.z), hex);
+    };
+    // bông hồng: nụ + vòng cánh ngoài
+    const rose = (x: number, y: number, z: number, r: number, hex: number) => {
+      P(new THREE.IcosahedronGeometry(r * 0.75, 1).translate(x, y + r * 0.1, z), hex);
+      P(new THREE.TorusGeometry(r * 0.72, r * 0.38, 6, 12).rotateX(Math.PI / 2).translate(x, y - r * 0.12, z), shade(hex, 0.86));
+    };
+    // nơ (hướng ra phía trước +z)
+    const bow = (x: number, y: number, z: number, s: number, hex: number) => {
+      P(new THREE.TorusGeometry(0.075 * s, 0.028 * s, 6, 14).scale(1, 0.7, 0.6).rotateZ(0.45).translate(x - 0.075 * s, y + 0.01 * s, z), hex);
+      P(new THREE.TorusGeometry(0.075 * s, 0.028 * s, 6, 14).scale(1, 0.7, 0.6).rotateZ(-0.45).translate(x + 0.075 * s, y + 0.01 * s, z), hex);
+      P(new THREE.BoxGeometry(0.03 * s, 0.11 * s, 0.02 * s).rotateZ(0.35).translate(x - 0.035 * s, y - 0.07 * s, z), hex);
+      P(new THREE.BoxGeometry(0.03 * s, 0.11 * s, 0.02 * s).rotateZ(-0.35).translate(x + 0.035 * s, y - 0.07 * s, z), hex);
+      sph(0.038 * s, 0.038 * s, 0.03 * s, x, y, z + 0.005 * s, shade(hex, 0.9), 10);
+    };
+    const GOLD = 0xd6b067;
+    const RED = 0xc0263f;
+    const PINK = 0xf0a5b5;
+    const WHITE = 0xfbf6ee;
+    const LEAF = 0x5e7f4f;
+
     if (type === 'rose') {
-      parts.push(colorGeom(new THREE.CylinderGeometry(0.012, 0.012, 0.4, 5).translate(0, 0.2, 0), 0x5f7f4c));
-      bloom(0, 0.42, 0, 0.07, 0xc23b52);
-      leaf(0.05, 0.25, 0);
+      // Bình hoa hồng
+      cyl(0.13, 0.11, 0.05, 0, 0.025, 0, GOLD);
+      cyl(0.16, 0.11, 0.4, 0, 0.25, 0, 0xf4efe6);
+      cyl(0.11, 0.16, 0.1, 0, 0.5, 0, 0xf4efe6);
+      P(new THREE.TorusGeometry(0.155, 0.012, 6, 24).rotateX(Math.PI / 2).translate(0, 0.43, 0), GOLD);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        P(new THREE.SphereGeometry(1, 8, 5).scale(0.13, 0.02, 0.05).rotateY(-a).rotateZ(0.5 * Math.cos(a)).translate(Math.cos(a) * 0.13, 0.6, Math.sin(a) * 0.13), LEAF);
+      }
+      const spots: Array<[number, number, number]> = [[0, 0.96, 0]];
+      for (let i = 0; i < 6; i++) spots.push([Math.cos(i * 1.047) * 0.12, 0.86, Math.sin(i * 1.047) * 0.12]);
+      for (let i = 0; i < 8; i++) spots.push([Math.cos(i * 0.785 + 0.4) * 0.22, 0.73, Math.sin(i * 0.785 + 0.4) * 0.22]);
+      spots.forEach(([x, y, z], i) => rose(x, y, z, 0.075, i % 3 === 2 ? 0xd8475e : RED));
+      bow(0, 0.34, 0.165, 1.1, 0xe7c6cf);
     } else if (type === 'hydrangea') {
-      parts.push(colorGeom(new THREE.CylinderGeometry(0.08, 0.05, 0.25, 10).translate(0, 0.125, 0), 0xf2ece4));
-      for (let i = 0; i < 14; i++) {
-        const a = i * 2.4;
-        const r = 0.04 + (i % 3) * 0.035;
-        bloom(Math.cos(a) * r, 0.33 + (i % 4) * 0.02, Math.sin(a) * r, 0.05, i % 2 ? 0x9fb7e0 : 0xc6b4e2);
+      // Chậu cẩm tú cầu
+      cyl(0.3, 0.22, 0.42, 0, 0.21, 0, 0xf3eee6);
+      P(new THREE.TorusGeometry(0.3, 0.025, 6, 28).rotateX(Math.PI / 2).translate(0, 0.42, 0), GOLD);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        P(new THREE.SphereGeometry(1, 8, 5).scale(0.14, 0.025, 0.07).rotateY(-a).translate(Math.cos(a) * 0.27, 0.47, Math.sin(a) * 0.27), LEAF);
       }
-    } else if (type === 'basket') {
-      parts.push(colorGeom(new THREE.CylinderGeometry(0.22, 0.15, 0.22, 14).translate(0, 0.11, 0), 0xb08a5a));
-      parts.push(colorGeom(new THREE.TorusGeometry(0.2, 0.015, 6, 20, Math.PI).translate(0, 0.25, 0), 0xb08a5a));
-      for (let i = 0; i < 12; i++) {
-        const a = i * 2.4;
-        bloom(Math.cos(a) * 0.12, 0.26 + (i % 3) * 0.02, Math.sin(a) * 0.12, 0.055, [0xf0bcc2, 0xfbeee6, 0xe8c48a][i % 3]);
+      const heads: Array<[number, number, number, number]> = [
+        [-0.15, 0.62, 0.03, 0x8fb0e6],
+        [0.15, 0.62, 0.05, 0xb9a3e3],
+        [0, 0.74, -0.08, 0xa7c1ee],
+        [0, 0.6, 0.18, 0xe8b8d0],
+      ];
+      for (const [cx, cy, cz, hex] of heads) {
+        for (let i = 0; i < 16; i++) {
+          const phi = Math.acos(1 - (i + 0.5) / 16); // nửa cầu trên
+          const th = i * 2.4;
+          const r = 0.16;
+          P(new THREE.IcosahedronGeometry(0.052, 0).translate(cx + Math.sin(phi) * Math.cos(th) * r, cy + Math.cos(phi) * r * 0.9, cz + Math.sin(phi) * Math.sin(th) * r), i % 3 ? hex : shade(hex, 1.08));
+        }
       }
+    } else if (type === 'diapers') {
+      // Bịch tã em bé (túi nilon phồng + quai xách)
+      box(0.52, 0.5, 0.3, 0, 0.25, 0, 0x9ccbef);
+      sph(0.26, 0.04, 0.15, 0, 0.5, 0, 0x9ccbef, 14);
+      P(new THREE.TorusGeometry(0.09, 0.018, 6, 16, Math.PI).translate(0, 0.52, 0), 0x7fb6e3);
+      bow(0.18, 0.47, 0.155, 0.9, 0xf3a6bd);
+    } else if (type === 'washing_machine') {
+      // Máy giặt cửa trước
+      const WM = 0xf6f6f4;
+      box(0.62, 0.84, 0.58, 0, 0.44, 0, WM);
+      box(0.6, 0.02, 0.56, 0, 0.012, 0, 0x9a9a9a);
+      box(0.6, 0.11, 0.015, 0, 0.78, 0.296, 0xdedfe2);
+      box(0.14, 0.05, 0.01, 0.08, 0.78, 0.305, 0x2c3440);
+      P(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 16).rotateX(Math.PI / 2).translate(-0.18, 0.78, 0.31), 0xb9bcc2);
+      sph(0.012, 0.012, 0.006, 0.2, 0.79, 0.306, 0x48c774, 6);
+      P(new THREE.TorusGeometry(0.19, 0.035, 10, 32).translate(0, 0.4, 0.3), 0xc9ccd1);
+      P(new THREE.CylinderGeometry(0.165, 0.165, 0.02, 32).rotateX(Math.PI / 2).translate(0, 0.4, 0.292), 0x5d7489);
+      sph(0.1, 0.1, 0.02, -0.04, 0.44, 0.302, 0x8fb3cc, 12);
+      box(0.03, 0.08, 0.02, 0.19, 0.4, 0.33, 0xb9bcc2);
+      bow(0.18, 0.92, 0.0, 1.5, 0xc0263f);
+    } else if (type === 'car') {
+      // Xe hoa (thân xe nằm ngang, mặt bên quay ra phía khách)
+      const BODY = 0xf7f3ec;
+      const GLASS = 0x5c6f82;
+      box(1.34, 0.26, 0.62, 0, 0.3, 0, BODY);
+      box(0.4, 0.07, 0.6, 0.45, 0.46, 0, BODY);
+      box(0.7, 0.27, 0.56, -0.13, 0.56, 0, BODY);
+      box(0.62, 0.04, 0.58, -0.13, 0.71, 0, BODY);
+      box(0.3, 0.17, 0.566, -0.3, 0.57, 0, GLASS);
+      box(0.27, 0.17, 0.566, 0.04, 0.57, 0, GLASS);
+      P(new THREE.BoxGeometry(0.02, 0.2, 0.5).rotateZ(-0.5).translate(0.235, 0.57, 0), GLASS);
+      for (const [x, z] of [[-0.42, 0.3], [0.42, 0.3], [-0.42, -0.3], [0.42, -0.3]]) {
+        P(new THREE.CylinderGeometry(0.15, 0.15, 0.09, 18).rotateX(Math.PI / 2).translate(x, 0.15, z), 0x2a2522);
+        P(new THREE.CylinderGeometry(0.075, 0.075, 0.095, 12).rotateX(Math.PI / 2).translate(x, 0.15, z * 1.02), 0xd9d9d9);
+      }
+      box(0.04, 0.07, 0.64, 0.68, 0.22, 0, 0xd0d0d0);
+      box(0.04, 0.07, 0.64, -0.68, 0.22, 0, 0xd0d0d0);
+      for (const z of [-0.2, 0.2]) {
+        sph(0.02, 0.045, 0.06, 0.672, 0.36, z, 0xfff3c4, 10);
+        sph(0.02, 0.04, 0.05, -0.672, 0.36, z, 0xd8424f, 10);
+      }
+      // trái tim hoa trên nắp capo
+      for (let i = 0; i < 20; i++) {
+        const t = (i / 20) * Math.PI * 2;
+        const hx = 16 * Math.pow(Math.sin(t), 3);
+        const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        rose(0.44 + hy * 0.011, 0.53, hx * 0.013, 0.04, i % 2 ? RED : PINK);
+      }
+      rose(0.47, 0.53, 0, 0.05, PINK);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        rose(-0.13 + Math.cos(a) * 0.13, 0.76, Math.sin(a) * 0.13, 0.045, i % 3 ? WHITE : PINK);
+      }
+      rose(-0.13, 0.8, 0, 0.055, RED);
+      for (const z of [-0.24, 0.24]) rod(new THREE.Vector3(0.44, 0.52, 0), new THREE.Vector3(0.21, 0.7, z), 0.012, PINK);
+      bow(-0.67, 0.4, 0.0, 1.0, PINK);
+    } else if (type === 'teddy') {
+      // Gấu bông ngồi
+      const FUR = 0xb07a4f;
+      const MUZ = 0xe9cfa8;
+      sph(0.31, 0.34, 0.28, 0, 0.36, 0, FUR, 20);
+      sph(0.19, 0.22, 0.06, 0, 0.36, 0.24, MUZ, 14);
+      sph(0.23, 0.21, 0.21, 0, 0.82, 0.02, FUR, 20);
+      for (const s of [-1, 1]) {
+        sph(0.085, 0.085, 0.05, s * 0.16, 1.0, 0, FUR, 12);
+        sph(0.05, 0.05, 0.03, s * 0.16, 1.0, 0.03, MUZ, 10);
+        sph(0.1, 0.17, 0.1, s * 0.3, 0.44, 0.08, FUR, 12); // tay
+        sph(0.11, 0.1, 0.18, s * 0.15, 0.1, 0.22, FUR, 12); // chân duỗi trước
+        sph(0.075, 0.075, 0.02, s * 0.15, 0.1, 0.4, MUZ, 12);
+        sph(0.022, 0.026, 0.015, s * 0.075, 0.87, 0.2, 0x1e1715, 8); // mắt
+      }
+      sph(0.1, 0.075, 0.07, 0, 0.77, 0.18, MUZ, 14);
+      sph(0.035, 0.026, 0.025, 0, 0.8, 0.245, 0x2a1d18, 8);
+      bow(0, 0.62, 0.2, 1.3, 0xe78fa6);
+    } else if (type === 'rice_cooker') {
+      // Nồi cơm điện (thắt nơ đỏ)
+      cyl(0.27, 0.27, 0.04, 0, 0.02, 0, 0x8d8d8d);
+      cyl(0.3, 0.28, 0.34, 0, 0.21, 0, 0xfbfaf7, 28);
+      cyl(0.303, 0.303, 0.06, 0, 0.3, 0, 0xe79fb0, 28);
+      P(new THREE.SphereGeometry(0.3, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.42, 1).translate(0, 0.38, 0), 0xeceae6);
+      P(new THREE.TorusGeometry(0.1, 0.02, 6, 16, Math.PI).translate(0, 0.49, 0), 0x9a9a9a);
+      box(0.2, 0.1, 0.03, 0, 0.21, 0.285, 0x3b3b40);
+      sph(0.018, 0.018, 0.01, -0.045, 0.21, 0.302, 0xe05a3a, 8);
+      sph(0.018, 0.018, 0.01, 0.045, 0.21, 0.302, 0xf2a33a, 8);
+      bow(0.12, 0.47, 0.12, 1.2, RED);
+    } else if (type === 'detergent') {
+      // Thùng bột giặt
+      box(0.5, 0.66, 0.26, 0, 0.33, 0, 0x1d50b8);
+      box(0.2, 0.05, 0.04, 0, 0.685, 0, 0x163f91);
+      bow(0.17, 0.62, 0.135, 0.9, RED);
+    } else if (type === 'noodles') {
+      // 2 thùng mì chồng lên nhau
+      box(0.62, 0.38, 0.42, 0, 0.19, 0, 0xd9a35f);
+      box(0.63, 0.006, 0.08, 0, 0.381, 0, 0xc9b38b);
+      P(new THREE.BoxGeometry(0.6, 0.36, 0.4).rotateY(0.12).translate(0.02, 0.56, 0), 0xd9a35f);
+      P(new THREE.BoxGeometry(0.61, 0.006, 0.08).rotateY(0.12).translate(0.02, 0.741, 0), 0xc9b38b);
+    } else if (type === 'piggy') {
+      // Heo đất
+      const BODY = 0xef8593;
+      sph(0.28, 0.26, 0.34, 0, 0.33, 0, BODY, 22);
+      P(new THREE.CylinderGeometry(0.09, 0.1, 0.08, 16).rotateX(Math.PI / 2).translate(0, 0.33, 0.36), 0xf5a7b1);
+      for (const s of [-1, 1]) {
+        sph(0.018, 0.024, 0.01, s * 0.032, 0.33, 0.402, 0x7a3640, 8);
+        sph(0.024, 0.024, 0.015, s * 0.1, 0.45, 0.28, 0x1e1715, 8);
+        P(new THREE.ConeGeometry(0.07, 0.13, 8).rotateZ(-s * 0.4).translate(s * 0.15, 0.57, 0.1), BODY);
+        for (const z of [-0.17, 0.17]) cyl(0.06, 0.07, 0.12, s * 0.14, 0.06, z, BODY, 10);
+        // hoa văn hoa trên hông
+        rose(s * 0.27, 0.36, 0.02, 0.045, RED);
+        rose(s * 0.25, 0.25, -0.12, 0.035, 0xf2cf6a);
+        rose(s * 0.25, 0.44, -0.13, 0.035, 0xf2cf6a);
+      }
+      box(0.14, 0.012, 0.03, 0, 0.59, -0.03, 0x3a2a2a);
+      P(new THREE.TorusGeometry(0.04, 0.012, 6, 12).translate(0, 0.38, -0.35), BODY);
+    } else if (type === 'gift_box') {
+      // Hộp quà bí mật
+      box(0.56, 0.5, 0.56, 0, 0.25, 0, 0xd2546b);
+      box(0.6, 0.1, 0.6, 0, 0.54, 0, 0xc34a60);
+      box(0.1, 0.505, 0.565, 0, 0.25, 0, GOLD);
+      box(0.565, 0.505, 0.1, 0, 0.25, 0, GOLD);
+      box(0.1, 0.105, 0.605, 0, 0.54, 0, GOLD);
+      box(0.605, 0.105, 0.1, 0, 0.54, 0, GOLD);
+      bow(0, 0.66, 0, 2.0, GOLD);
     } else {
-      // xe hoa mini
-      parts.push(colorGeom(new THREE.BoxGeometry(0.5, 0.14, 0.26).translate(0, 0.12, 0), 0xf3ece1));
-      parts.push(colorGeom(new THREE.BoxGeometry(0.28, 0.12, 0.24).translate(-0.04, 0.25, 0), 0xf3ece1));
-      for (const [x, z] of [[-0.16, 0.13], [0.16, 0.13], [-0.16, -0.13], [0.16, -0.13]]) {
-        parts.push(colorGeom(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 10).rotateX(Math.PI / 2).translate(x, 0.05, z), 0x2b2420));
-      }
-      for (let i = 0; i < 6; i++) bloom(0.18 - (i % 3) * 0.04, 0.22, (i < 3 ? 1 : -1) * 0.05, 0.04, i % 2 ? 0xc23b52 : 0xf0bcc2);
+      // Phong bì mừng cưới trên giá
+      rod(new THREE.Vector3(-0.28, 0, 0.14), new THREE.Vector3(-0.12, 1.1, 0), 0.014, GOLD);
+      rod(new THREE.Vector3(0.28, 0, 0.14), new THREE.Vector3(0.12, 1.1, 0), 0.014, GOLD);
+      rod(new THREE.Vector3(0, 0, -0.32), new THREE.Vector3(0, 1.02, -0.02), 0.014, GOLD);
+      box(0.66, 0.03, 0.09, 0, 0.5, 0.07, GOLD);
+      P(new THREE.BoxGeometry(0.62, 0.44, 0.02).rotateX(-0.12).translate(0, 0.74, 0.05), 0xb80f2a);
     }
     const g = mergeColored(parts);
+    g.computeBoundingSphere();
     this.giftGeomCache.set(type, g);
     return g;
   }
 
+  // Nhãn chữ in trên quà (bột giặt, thùng mì, phong bì, băng rôn, xe hoa)
+  private giftLabels(type: string): THREE.Mesh[] {
+    const make = (key: string, w: number, h: number, draw: (c: CanvasRenderingContext2D, W: number, H: number) => void) => {
+      let base = this.giftLabelCache.get(key);
+      if (!base) {
+        const W = 512;
+        const H = Math.round((512 * h) / w);
+        const cv = document.createElement('canvas');
+        cv.width = W;
+        cv.height = H;
+        const c = cv.getContext('2d')!;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        draw(c, W, H);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        base = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, transparent: true }));
+        this.giftLabelCache.set(key, base);
+      }
+      return new THREE.Mesh(base.geometry, base.material);
+    };
+    const at = (m: THREE.Mesh, x: number, y: number, z: number, ry = 0, rx = 0) => {
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, 0);
+      return m;
+    };
+    if (type === 'detergent') {
+      return [
+        at(
+          make('omo', 0.48, 0.62, (c, W, H) => {
+            const gr = c.createLinearGradient(0, 0, 0, H);
+            gr.addColorStop(0, '#2c6be0');
+            gr.addColorStop(1, '#173f95');
+            c.fillStyle = gr;
+            c.fillRect(0, 0, W, H);
+            c.fillStyle = '#ffffff';
+            c.beginPath();
+            c.arc(W / 2, H * 0.38, W * 0.36, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = '#e21f26';
+            c.lineWidth = 14;
+            c.beginPath();
+            c.arc(W / 2, H * 0.38, W * 0.31, 0.3, Math.PI * 1.75);
+            c.stroke();
+            c.fillStyle = '#e21f26';
+            c.font = `900 150px ${SANS_FONT}`;
+            c.fillText('OMO', W / 2, H * 0.39);
+            c.fillStyle = '#ffffff';
+            c.font = `800 52px ${SANS_FONT}`;
+            c.fillText('BỘT GIẶT', W / 2, H * 0.74);
+            c.font = `600 34px ${SANS_FONT}`;
+            c.fillText('Trắng sạch · Thơm lâu', W / 2, H * 0.85);
+            c.fillStyle = '#f2cf6a';
+            c.font = `700 30px ${SANS_FONT}`;
+            c.fillText('Tặng Duy ♥ Tâm', W / 2, H * 0.94);
+          }),
+          0,
+          0.33,
+          0.131
+        ),
+      ];
+    }
+    if (type === 'noodles') {
+      const label = (c: CanvasRenderingContext2D, W: number, H: number) => {
+        c.fillStyle = '#f6c343';
+        c.fillRect(0, 0, W, H);
+        c.fillStyle = '#d7261e';
+        c.fillRect(0, 0, W, H * 0.2);
+        c.fillRect(0, H * 0.84, W, H * 0.16);
+        c.fillStyle = '#ffffff';
+        c.font = `800 38px ${SANS_FONT}`;
+        c.fillText('THÙNG 30 GÓI', W / 2, H * 0.1);
+        c.fillStyle = '#c0261e';
+        c.font = `900 108px ${SANS_FONT}`;
+        c.fillText('MÌ TÔM', W / 2, H * 0.48);
+        c.fillStyle = '#7a3b12';
+        c.font = `700 34px ${SANS_FONT}`;
+        c.fillText('Chua cay · Cứu đói cuối tháng', W / 2, H * 0.71);
+        c.fillStyle = '#ffffff';
+        c.font = `700 30px ${SANS_FONT}`;
+        c.fillText('Tặng Duy ♥ Tâm', W / 2, H * 0.92);
+      };
+      const top = make('noodles', 0.56, 0.32, label);
+      top.rotation.y = 0.12;
+      return [at(make('noodles', 0.58, 0.33, label), 0, 0.19, 0.211), at(top, 0.045, 0.56, 0.2 + 0.0, 0.12)];
+    }
+    if (type === 'envelope') {
+      return [
+        at(
+          make('envelope', 0.6, 0.42, (c, W, H) => {
+            c.fillStyle = '#c8102e';
+            c.fillRect(0, 0, W, H);
+            c.strokeStyle = '#e8c06a';
+            c.lineWidth = 10;
+            c.strokeRect(14, 14, W - 28, H - 28);
+            c.lineWidth = 5;
+            c.beginPath();
+            c.moveTo(14, 14);
+            c.lineTo(W / 2, H * 0.48);
+            c.lineTo(W - 14, 14);
+            c.stroke();
+            c.fillStyle = '#f2cf6a';
+            c.font = `700 64px ${SCRIPT_FONT}`;
+            c.fillText('Mừng Cưới', W / 2, H * 0.66);
+            c.font = `700 30px ${SANS_FONT}`;
+            c.fillText('Duy ♥ Tâm · 29.11.2026', W / 2, H * 0.84);
+          }),
+          0,
+          0.742,
+          0.062,
+          0,
+          -0.12
+        ),
+      ];
+    }
+    if (type === 'diapers') {
+      return [
+        at(
+          make('diapers', 0.48, 0.44, (c, W, H) => {
+            const gr = c.createLinearGradient(0, 0, 0, H);
+            gr.addColorStop(0, '#d9efff');
+            gr.addColorStop(1, '#9ccbef');
+            c.fillStyle = gr;
+            c.fillRect(0, 0, W, H);
+            c.font = `110px ${SANS_FONT}`;
+            c.fillText('👶', W / 2, H * 0.3);
+            c.fillStyle = '#2f5f9e';
+            c.font = `900 72px ${SANS_FONT}`;
+            c.fillText('TÃ EM BÉ', W / 2, H * 0.6);
+            c.fillStyle = '#d0587a';
+            c.font = `700 34px ${SANS_FONT}`;
+            c.fillText('Size: Sắp có ♥', W / 2, H * 0.76);
+            c.fillStyle = '#2f5f9e';
+            c.font = `600 28px ${SANS_FONT}`;
+            c.fillText('Chúc Duy & Tâm sớm có tin vui', W / 2, H * 0.9);
+          }),
+          0,
+          0.25,
+          0.151
+        ),
+      ];
+    }
+    if (type === 'car') {
+      const plate = (c: CanvasRenderingContext2D, W: number, H: number) => {
+        c.fillStyle = '#f7f3ec';
+        c.fillRect(0, 0, W, H);
+        c.fillStyle = '#b5354d';
+        c.font = `700 64px ${SCRIPT_FONT}`;
+        c.fillText('Just Married', W * 0.5, H * 0.42);
+        c.font = `700 26px ${SANS_FONT}`;
+        c.fillText('DUY ♥ TÂM', W * 0.5, H * 0.82);
+      };
+      return [at(make('car', 0.8, 0.2, plate), -0.05, 0.3, 0.312), at(make('car', 0.8, 0.2, plate), -0.05, 0.3, -0.312, Math.PI)];
+    }
+    return [];
+  }
+
+  private giftNameSprite(author: string) {
+    const cv = document.createElement('canvas');
+    cv.width = 512;
+    cv.height = 96;
+    const c = cv.getContext('2d')!;
+    const text = `💝 ${author}`;
+    let size = 40;
+    c.font = `600 ${size}px ${SANS_FONT}`;
+    while (size > 22 && c.measureText(text).width > 450) {
+      size -= 2;
+      c.font = `600 ${size}px ${SANS_FONT}`;
+    }
+    const w = Math.min(500, c.measureText(text).width + 50);
+    c.fillStyle = 'rgba(255, 250, 244, 0.9)';
+    c.strokeStyle = 'rgba(190, 150, 90, 0.7)';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.roundRect(256 - w / 2, 14, w, 68, 34);
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#7a3442';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(text, 256, 50);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sp.scale.set(1.05, 0.197, 1);
+    sp.renderOrder = 5;
+    return sp;
+  }
+
+  private disposeGift(g: THREE.Object3D) {
+    g.traverse((o) => {
+      if (o instanceof THREE.Sprite) {
+        o.material.map?.dispose();
+        o.material.dispose();
+      }
+    });
+  }
+
   public syncFlowers(flowers: FlowerGift[]) {
+    [...this.flowerGroup.children].forEach((g) => this.disposeGift(g));
     this.flowerGroup.clear();
-    flowers.forEach((f) => this.addFlowerMesh(f));
+    flowers.forEach((f) => this.addFlowerMesh(f, false));
   }
 
   public addFlower(flower: FlowerGift) {
-    this.addFlowerMesh(flower);
+    this.addFlowerMesh(flower, true);
   }
 
-  private addFlowerMesh(f: FlowerGift) {
+  private addFlowerMesh(f: FlowerGift, animate: boolean) {
+    const base = WeddingHall3D.GIFT_INFO[f.flowerType] || { h: 0.8, r: 0.4 };
+    const scale = WeddingHall3D.GIFT_SCALE * (base.s || 1);
+    const g = new THREE.Group();
     const mesh = new THREE.Mesh(this.giftGeometry(f.flowerType), this.giftMaterial);
-    mesh.position.set(f.position[0], 1.2, f.position[2]);
-    mesh.rotation.y = Math.random() * Math.PI * 2;
-    mesh.userData.id = f.id;
-    this.flowerGroup.add(mesh);
-    while (this.flowerGroup.children.length > 60) this.flowerGroup.remove(this.flowerGroup.children[0]);
+    mesh.castShadow = true;
+    const body = new THREE.Group();
+    body.add(mesh);
+    this.giftLabels(f.flowerType).forEach((l) => body.add(l));
+    g.add(body);
+    // quay nhẹ vào phía thảm đỏ cho tự nhiên
+    const x = f.position[0];
+    const y = f.position[1] > 0.6 ? 1.2 : 0; // quà cũ (trên sân khấu) vẫn hiện đúng chỗ
+    g.position.set(x, y, f.position[2]);
+    // xe hoa đỗ chéo, đầu xe hướng ra thảm đỏ; quà khác quay nhẹ vào thảm đỏ
+    body.rotation.y =
+      f.flowerType === 'car'
+        ? (x < 0 ? 0.55 : Math.PI - 0.55)
+        : (x < 0 ? 0.22 : -0.22) + (Math.random() - 0.5) * 0.2;
+    body.scale.setScalar(scale);
+    // bảng tên: hàng ngoài thấp hơn hàng sát sân khấu để không chồng nhau
+    const tag = this.giftNameSprite(f.author);
+    const frontRow = f.position[2] > -12.3;
+    tag.position.set(0, base.h * scale + (frontRow ? 0.12 : 0.32), 0);
+    g.add(tag);
+    g.userData = { id: f.id, r: base.r * scale, pop: animate ? 0 : 1 };
+    if (animate) g.scale.setScalar(0.001);
+    this.flowerGroup.add(g);
+    while (this.flowerGroup.children.length > 40) {
+      const old = this.flowerGroup.children[0];
+      this.disposeGift(old);
+      this.flowerGroup.remove(old);
+    }
+  }
+
+  // quà mới tặng "bật" ra (phóng to có độ nảy)
+  private updateGiftPops(delta: number) {
+    for (const g of this.flowerGroup.children) {
+      const u = g.userData;
+      if (u.pop >= 1) continue;
+      u.pop = Math.min(1, u.pop + delta * 1.8);
+      const t = u.pop;
+      const c1 = 1.70158;
+      const s = 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); // easeOutBack
+      g.scale.setScalar(Math.max(0.001, s));
+    }
   }
 
   // ---------------- NGÀY / ĐÊM ----------------
@@ -2285,11 +2718,27 @@ export class WeddingHall3D {
       }
     }
 
+    // Quà khách tặng dưới chân sân khấu
+    if (!onStageNow) {
+      for (const g of this.flowerGroup.children) {
+        const r = g.userData.r as number | undefined;
+        if (!r || g.position.y > 0.5) continue;
+        const dx = x - g.position.x;
+        const dz = z - g.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < r) {
+          x = g.position.x + (d < 1e-4 ? r : (dx * r) / d);
+          z = g.position.z + (d < 1e-4 ? 0 : (dz * r) / d);
+        }
+      }
+    }
+
     return { pos: new THREE.Vector3(x, y, z), onStage };
   }
 
   // ---------------- VÒNG LẶP ----------------
   public update(delta: number, frameCount: number) {
+    this.updateGiftPops(delta);
     const d = this.petalDummy;
     for (let i = 0; i < this.petalCount; i++) {
       const p = this.petalData[i];
