@@ -74,7 +74,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </label>
             <input
               type="text"
-              maxLength={20}
+              maxLength={40}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3.5 py-2 rounded-xl border-2 border-rose-200 focus:border-rose-500 outline-none text-sm font-semibold"
