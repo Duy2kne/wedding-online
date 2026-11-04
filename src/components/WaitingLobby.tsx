@@ -268,7 +268,7 @@ export const WaitingLobby: React.FC<WaitingLobbyProps> = ({
                 </label>
                 <input
                   type="text"
-                  maxLength={20}
+                  maxLength={40}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Nhập họ tên / biệt danh..."
