@@ -102,7 +102,8 @@ if (fs.existsSync(DATA_FILE)) {
     storedData = {
       users: parsed.users || {},
       wishes: parsed.wishes || [],
-      flowers: parsed.flowers || [],
+      // quà cũ (đặt trên sân khấu, không có ô) bỏ đi
+      flowers: (parsed.flowers || []).filter((f: FlowerGift) => typeof f.slot === 'number'),
       seats: parsed.seats || {},
     };
     console.log(`Loaded persisted data: ${Object.keys(storedData.users).length} users, ${storedData.wishes.length} wishes.`);
@@ -399,14 +400,30 @@ function getLeaderboard(): LeaderboardEntry[] {
   return entries;
 }
 
+// Ô đặt quà: sàn ngay trước sân khấu, 2 bên thảm đỏ (thảm rộng 3.4m, mép sân khấu ở z = -14).
+// Ưu tiên ô gần thảm đỏ trước, xen kẽ trái / phải cho cân đối.
+const GIFT_SLOTS: Array<[number, number]> = (() => {
+  const cells: Array<[number, number]> = [];
+  for (const x of [3.5, 5.1, 6.7, 8.3, 9.9]) cells.push([x, -13.0]); // hàng sát sân khấu
+  for (const x of [4.3, 5.9, 7.5, 9.1]) cells.push([x, -11.45]); // hàng ngoài (so le)
+  cells.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const out: Array<[number, number]> = [];
+  for (const [x, z] of cells) out.push([-x, z], [x, z]);
+  return out;
+})();
+
+function hallFlowersOf(hallId: string) {
+  return storedData.flowers.filter((f) => f.hallId === hallId);
+}
+
 // Clean expired flowers (older than 30 mins)
 function cleanExpiredFlowers() {
   const now = Date.now();
-  const initialLen = storedData.flowers.length;
+  const expiredHalls = new Set(storedData.flowers.filter((f) => f.expiresAt <= now).map((f) => f.hallId));
+  if (!expiredHalls.size) return;
   storedData.flowers = storedData.flowers.filter((f) => f.expiresAt > now);
-  if (storedData.flowers.length !== initialLen) {
-    io.emit('flowers:sync', storedData.flowers);
-  }
+  // chỉ gửi quà của đúng sảnh đó
+  for (const hallId of expiredHalls) io.to(hallId).emit('flowers:sync', hallFlowersOf(hallId));
 }
 setInterval(cleanExpiredFlowers, 60000);
 
@@ -827,20 +844,20 @@ io.on('connection', (socket: Socket) => {
     // Deduct available score (cumulative score stays intact!)
     u.availableScore -= item.price;
 
-    // Stage coordinates: [x, 1.2, -18]
-    // Generate flower position on or around stage
-    const hallFlowers = storedData.flowers.filter((f) => f.hallId === p.hallId);
-    if (hallFlowers.length >= 60) {
-      // Remove oldest in this hall
-      const oldestIdx = storedData.flowers.findIndex((f) => f.hallId === p.hallId);
-      if (oldestIdx !== -1) storedData.flowers.splice(oldestIdx, 1);
+    // Đặt quà vào ô trống dưới chân sân khấu; hết ô thì thay món cũ nhất
+    const hallFlowers = hallFlowersOf(p.hallId);
+    const used = new Set(hallFlowers.map((f) => f.slot));
+    let slot = GIFT_SLOTS.findIndex((_, i) => !used.has(i));
+    let replaced = false;
+    if (slot === -1) {
+      const oldest = hallFlowers[0];
+      slot = oldest.slot ?? 0;
+      storedData.flowers.splice(storedData.flowers.indexOf(oldest), 1);
+      replaced = true;
     }
-
-    const stageSlot = hallFlowers.length % 20;
-    const row = Math.floor(stageSlot / 10);
-    const col = stageSlot % 10;
-    const posX = -4.5 + col * 1.0 + (Math.random() - 0.5) * 0.2;
-    const posZ = -15.5 + row * 0.8;
+    const [slotX, slotZ] = GIFT_SLOTS[slot];
+    const posX = slotX + (Math.random() - 0.5) * 0.12;
+    const posZ = slotZ + (Math.random() - 0.5) * 0.12;
 
     const newFlower: FlowerGift = {
       id: 'flw_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -848,7 +865,8 @@ io.on('connection', (socket: Socket) => {
       author: p.name,
       flowerType: item.id as any,
       flowerName: item.name,
-      position: [posX, 1.25, posZ],
+      position: [posX, 0, posZ],
+      slot,
       hallId: p.hallId,
       createdAt: Date.now(),
       expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
@@ -860,11 +878,12 @@ io.on('connection', (socket: Socket) => {
     socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
     sendBackup(socket, u);
 
-    // Broadcast new flower item ONLY (using addFlower, not wiping old ones)
-    io.to(p.hallId).emit('flower:new', newFlower);
+    // Phát món quà mới (hoặc cả danh sách nếu vừa thay món cũ nhất)
+    if (replaced) io.to(p.hallId).emit('flowers:sync', hallFlowersOf(p.hallId));
+    else io.to(p.hallId).emit('flower:new', newFlower);
     io.emit('toast:global', {
       type: 'flower',
-      message: `💐 ${p.name} vừa tặng "${item.name}" lên sân khấu cho Duy & Tâm!`,
+      message: `${item.icon} ${p.name} vừa tặng "${item.name}" cho Duy & Tâm!`,
     });
   });
 
