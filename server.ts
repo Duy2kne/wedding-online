@@ -75,7 +75,7 @@ if (fs.existsSync(CONFIG_PATH)) {
 // Profanity filter dictionary (Vietnamese common vulgar words)
 const BAD_WORDS = [
   'đm', 'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'chó đẻ', 'khốn nạn', 'mẹ kiếp',
-  'fuck', 'shit', 'bitch', 'asshole', 'dkm', 'vcl', 'clgt', 'đmm'
+  'fuck', 'shit', 'bitch', 'asshole', 'dkm', 'vcl', 'clgt', 'đmm','cc','clmm',
 ];
 
 function sanitizeText(input: string, maxLen = 200): string {
@@ -1320,6 +1320,60 @@ app.post('/api/admin/action', (req, res) => {
     });
     io.emit('fireworks:launch');
     res.json({ ok: true, top3 });
+  } else if (action === 'list_users') {
+    // Danh sách toàn bộ khách (kể cả đã rời tiệc) để admin cộng / trừ điểm
+    const online = new Set(Array.from(players.values()).map((p) => p.uid));
+    const users = Object.values(storedData.users)
+      .map((u) => ({
+        uid: u.uid,
+        name: u.name,
+        group: u.group,
+        cumulativeScore: u.cumulativeScore,
+        availableScore: u.availableScore,
+        isOnline: online.has(u.uid),
+      }))
+      .sort((a, b) => Number(b.isOnline) - Number(a.isOnline) || b.cumulativeScore - a.cumulativeScore);
+    res.json({ ok: true, users });
+  } else if (action === 'adjust_score') {
+    // Admin cộng (số dương) hoặc trừ (số âm) điểm Hỷ cho 1 khách, không bị giới hạn điểm/ngày của trò chơi
+    const uid = typeof payload?.uid === 'string' ? payload.uid : '';
+    const delta = Math.trunc(Number(payload?.delta));
+    const u = storedData.users[uid];
+    if (!u) {
+      res.status(404).json({ error: 'Không tìm thấy khách này' });
+      return;
+    }
+    if (!Number.isFinite(delta) || delta === 0 || Math.abs(delta) > 100000) {
+      res.status(400).json({ error: 'Số điểm không hợp lệ (từ -100000 đến 100000, khác 0)' });
+      return;
+    }
+    const reason = sanitizeText(typeof payload?.reason === 'string' ? payload.reason : '', 80);
+    u.cumulativeScore = Math.max(0, u.cumulativeScore + delta);
+    u.availableScore = Math.max(0, Math.min(u.cumulativeScore, u.availableScore + delta));
+    saveDatabase();
+    console.log(`[Admin] ${delta > 0 ? '+' : ''}${delta} điểm cho ${u.name} (${uid}) -> ${u.cumulativeScore}${reason ? ` | ${reason}` : ''}`);
+
+    // Báo ngay cho khách nếu đang online (có thể mở nhiều tab)
+    for (const [sid, p] of players) {
+      if (p.uid !== uid) continue;
+      const s = io.sockets.sockets.get(sid);
+      if (!s) continue;
+      s.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+      sendBackup(s, u);
+      s.emit('toast', {
+        type: delta > 0 ? 'success' : 'info',
+        message:
+          delta > 0
+            ? `🎁 Cô dâu chú rể tặng bạn +${delta} 💗 điểm Hỷ!${reason ? ` (${reason})` : ''}`
+            : `Điểm Hỷ của bạn được điều chỉnh ${delta} 💗${reason ? ` (${reason})` : ''}`,
+      });
+    }
+    io.emit('leaderboard:update', getLeaderboard().slice(0, 10));
+    res.json({
+      ok: true,
+      message: `Đã ${delta > 0 ? 'cộng' : 'trừ'} ${Math.abs(delta)} điểm cho ${u.name} (còn ${u.cumulativeScore} điểm)`,
+      user: { uid: u.uid, cumulativeScore: u.cumulativeScore, availableScore: u.availableScore },
+    });
   } else {
     res.status(400).json({ error: 'Unknown action' });
   }
