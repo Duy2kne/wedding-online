@@ -5,6 +5,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import type {
   PlayerState,
   HallInfo,
@@ -200,7 +201,8 @@ app.use((req, res, next) => {
       "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; " +
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com; " +
       "img-src 'self' data: blob: https://i.ytimg.com https://images.unsplash.com https:; " +
-      "connect-src 'self' https: wss: ws:;"
+      "connect-src 'self' https: wss: ws:; " +
+      "worker-src 'self' blob:;"
   );
   next();
 });
@@ -318,7 +320,7 @@ function getOrCreateUser(uid: string, initialName?: string, group?: string, gend
   if (!storedData.users[uid]) {
     storedData.users[uid] = {
       uid,
-      name: sanitizeText(initialName || 'Khách mời', 20),
+      name: sanitizeText(initialName || 'Khách mời', 40),
       group: (group as any) || 'friends',
       gender: (gender as any) || 'female',
       hairStyle: 0,
@@ -332,6 +334,53 @@ function getOrCreateUser(uid: string, initialName?: string, group?: string, gend
     };
   }
   return storedData.users[uid];
+}
+
+// ---------- Sao lưu điểm trên máy khách (chống mất điểm khi server khởi động lại) ----------
+// Render bản miễn phí xoá ổ đĩa mỗi lần server ngủ/khởi động lại -> wedding.json mất.
+// Server gửi cho khách 1 "phiếu" có chữ ký HMAC; khách cất trong localStorage và gửi lại khi vào tiệc.
+// Chữ ký dùng ADMIN_PASSWORD (hoặc SCORE_SECRET) nên khách không tự sửa điểm được.
+const BACKUP_SECRET = process.env.SCORE_SECRET || process.env.ADMIN_PASSWORD || ADMIN_PASSWORD;
+
+function makeBackup(u: UserData): string {
+  const payload = {
+    v: 1,
+    uid: u.uid,
+    name: u.name,
+    group: u.group,
+    gender: u.gender,
+    hairStyle: u.hairStyle,
+    hairColor: u.hairColor,
+    cumulativeScore: u.cumulativeScore,
+    availableScore: u.availableScore,
+    purchasedItems: u.purchasedItems,
+    equippedOutfit: u.equippedOutfit,
+    equippedAccessories: u.equippedAccessories,
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', BACKUP_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function readBackup(token: unknown, uid: string): Partial<UserData> | null {
+  if (typeof token !== 'string' || token.length > 8000) return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const expect = crypto.createHmac('sha256', BACKUP_SECRET).update(body).digest('base64url');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expect);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8'));
+    if (data?.uid !== uid) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function sendBackup(socket: Socket, u: UserData | undefined) {
+  if (u) socket.emit('backup', makeBackup(u));
 }
 
 // Leaderboard compute
@@ -456,6 +505,7 @@ io.on('connection', (socket: Socket) => {
     hairColor?: string;
     outfit?: string;
     preferredHall?: string;
+    backup?: string;
   }) => {
     currentUid = data.uid || socket.id;
     socketToUid.set(socket.id, currentUid);
@@ -468,8 +518,19 @@ io.on('connection', (socket: Socket) => {
       disconnectedUids.delete(currentUid);
     }
 
+    // Server mất dữ liệu (khởi động lại) mà khách còn phiếu sao lưu hợp lệ -> khôi phục điểm & đồ đã mua
+    const restored = readBackup(data.backup, currentUid);
+    const known = storedData.users[currentUid];
     const user = getOrCreateUser(currentUid, data.name, data.group, data.gender);
-    user.name = sanitizeText(data.name || user.name, 20);
+    if (restored && (!known || (restored.cumulativeScore || 0) > known.cumulativeScore)) {
+      user.cumulativeScore = Math.max(0, Number(restored.cumulativeScore) || 0);
+      user.availableScore = Math.max(0, Math.min(user.cumulativeScore, Number(restored.availableScore) || 0));
+      if (Array.isArray(restored.purchasedItems)) user.purchasedItems = restored.purchasedItems.filter((x) => typeof x === 'string').slice(0, 50);
+      if (typeof restored.equippedOutfit === 'string') user.equippedOutfit = restored.equippedOutfit;
+      if (Array.isArray(restored.equippedAccessories)) user.equippedAccessories = restored.equippedAccessories.filter((x) => typeof x === 'string').slice(0, 10);
+      console.log(`[Backup] Khôi phục điểm cho ${currentUid}: ${user.cumulativeScore}`);
+    }
+    user.name = sanitizeText(data.name || user.name, 40);
     user.group = data.group || user.group;
     user.gender = data.gender || user.gender;
     if (data.hairStyle !== undefined) user.hairStyle = data.hairStyle;
@@ -528,6 +589,7 @@ io.on('connection', (socket: Socket) => {
       videoTime: ((Date.now() - videoStartTime) / 1000),
       leaderboard: getLeaderboard().slice(0, 10),
     });
+    sendBackup(socket, user);
 
     // Notify other players in this hall
     socket.to(currentHallId).emit('player:joined', playerState);
@@ -644,6 +706,7 @@ io.on('connection', (socket: Socket) => {
         u.cumulativeScore += bonus;
         u.availableScore += bonus;
         socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+        sendBackup(socket, u);
       }
 
       if (collectiveToast) {
@@ -742,6 +805,7 @@ io.on('connection', (socket: Socket) => {
       u.cumulativeScore += 5;
       u.availableScore += 5;
       socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+      sendBackup(socket, u);
     }
 
     // Add to all halls with separate addWish (never clearing old wishes)
@@ -802,6 +866,7 @@ io.on('connection', (socket: Socket) => {
 
     // Notify user of new score
     socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+    sendBackup(socket, u);
 
     // Broadcast new flower item ONLY (using addFlower, not wiping old ones)
     io.to(p.hallId).emit('flower:new', newFlower);
@@ -846,7 +911,10 @@ io.on('connection', (socket: Socket) => {
     }
 
     socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+
+    sendBackup(socket, u);
     socket.emit('profile:updated', { user: u });
+    sendBackup(socket, u);
     io.to(p.hallId).emit('player:outfit_updated', {
       id: socket.id,
       outfit: p.outfit,
@@ -882,6 +950,8 @@ io.on('connection', (socket: Socket) => {
     }
 
     socket.emit('profile:updated', { user: u });
+
+    sendBackup(socket, u);
     io.to(p.hallId).emit('player:outfit_updated', {
       id: socket.id,
       outfit: p.outfit,
@@ -897,7 +967,7 @@ io.on('connection', (socket: Socket) => {
     if (!u) return;
 
     if (data.name) {
-      const clean = sanitizeText(data.name, 20);
+      const clean = sanitizeText(data.name, 40);
       if (clean) {
         u.name = clean;
         p.name = clean;
@@ -921,6 +991,8 @@ io.on('connection', (socket: Socket) => {
     }
 
     socket.emit('profile:updated', { user: u });
+
+    sendBackup(socket, u);
     io.to(p.hallId).emit('player:profile_updated', {
       id: socket.id,
       name: p.name,
@@ -984,6 +1056,8 @@ io.on('connection', (socket: Socket) => {
     u.availableScore += earnedScore;
 
     socket.emit('score:updated', { cumulativeScore: u.cumulativeScore, availableScore: u.availableScore });
+
+    sendBackup(socket, u);
     socket.emit('toast', { type: 'success', message: `🎉 Tuyệt vời! Bạn nhận được +${earnedScore} 💗 điểm Hỷ!` });
 
     // Broadcast top 10 if rank updated
